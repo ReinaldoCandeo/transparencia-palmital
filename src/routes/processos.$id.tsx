@@ -19,6 +19,7 @@ import {
   formatDateBR,
   formatDateTimeBR,
 } from "@/lib/mock-processos";
+import type { Tramitacao, Anexo } from "@/lib/mock-processos";
 
 export const Route = createFileRoute("/processos/$id")({
   loader: ({ params }) => {
@@ -150,7 +151,7 @@ function ProcessoDetalhes() {
           </p>
 
           <ol className="relative mt-6 border-l-2 border-border pl-6 sm:pl-8">
-            {processo.tramitacoes.map((t, i) => (
+            {processo.tramitacoes.map((t: Tramitacao, i: number) => (
               <li key={t.id} className="relative pb-8 last:pb-0">
                 <span
                   aria-hidden
@@ -209,7 +210,7 @@ function ProcessoDetalhes() {
           </p>
 
           <ul className="mt-5 divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-            {processo.anexos.map((a) => (
+            {processo.anexos.map((a: Anexo) => (
               <li
                 key={a.nome}
                 className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 p-4"
