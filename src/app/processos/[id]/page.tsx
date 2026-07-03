@@ -1,6 +1,3 @@
-"use client";
-
-import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -14,7 +11,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
-import { supabase } from "@/lib/supabase";
+import { get1DocProcessDetails } from "@/lib/onedoc";
 import { StatusBadge } from "@/app/page";
 
 function formatDateBR(isoString: string) {
@@ -64,43 +61,41 @@ interface ProcessoDetalhado {
   anexos?: Anexo[];
 }
 
-export default function DetalhesProcesso({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const [processo, setProcesso] = useState<ProcessoDetalhado | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default async function DetalhesProcesso({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const rawData = await get1DocProcessDetails(id);
 
-  useEffect(() => {
-    async function fetchData() {
-      const { data, error } = await supabase
-        .from("processos")
-        .select("*")
-        .eq("id", id)
-        .single();
-      
-      if (data) {
-        // Ordena as tramitações da mais recente para a mais antiga (descrescente)
-        // para facilitar a visualização do andamento atual pelo munícipe
-        if (data.tramitacoes) {
-          data.tramitacoes.sort((a: Tramitacao, b: Tramitacao) => 
-            new Date(b.data).getTime() - new Date(a.data).getTime()
-          );
-        }
-        setProcesso(data as ProcessoDetalhado);
-      } else {
-        console.error(error);
-      }
-      setIsLoading(false);
-    }
-    fetchData();
-  }, [id]);
-
-  if (isLoading) {
+  if (!rawData) {
     return (
       <PortalLayout>
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <p>Carregando processo...</p>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
+          <p className="text-muted-foreground">Processo não encontrado ou indisponível.</p>
+          <Link href="/" className="text-primary hover:underline">
+            Voltar para a busca
+          </Link>
         </div>
       </PortalLayout>
+    );
+  }
+
+  // Mapeamento dinâmico do payload 1Doc
+  const processo: ProcessoDetalhado = {
+    id: String(rawData.id || rawData.id_documento || id),
+    numero: String(rawData.numero || rawData.numero_processo || "N/A"),
+    ano: Number(rawData.ano || new Date().getFullYear()),
+    assunto: String(rawData.assunto || rawData.nome || "Assunto Indefinido"),
+    status: String(rawData.status || rawData.situacao || "Em Tramitação"),
+    setor: String(rawData.setor || rawData.departamento || "Geral"),
+    orgaoAtual: String(rawData.orgaoAtual || rawData.orgao || "Administração"),
+    dataAbertura: String(rawData.dataAbertura || rawData.data_cadastro || new Date().toISOString()),
+    requerente_nome: String(rawData.requerente_nome || rawData.solicitante || "Cidadão (LGPD)"),
+    tramitacoes: Array.isArray(rawData.tramitacoes) ? rawData.tramitacoes : [],
+    anexos: Array.isArray(rawData.anexos) ? rawData.anexos : []
+  };
+
+  if (processo.tramitacoes) {
+    processo.tramitacoes.sort((a: Tramitacao, b: Tramitacao) => 
+      new Date(b.data).getTime() - new Date(a.data).getTime()
     );
   }
 
