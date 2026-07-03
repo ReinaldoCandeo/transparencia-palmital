@@ -1,3 +1,0 @@
-module.exports=[35368,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(88724);a.n(d("[project]/Desktop/transparncia-palmital-main/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},25305,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(88724);a.n(d("[project]/Desktop/transparncia-palmital-main/node_modules/next/dist/client/components/builtin/global-error.js"))},60119,a=>{"use strict";a.i(35368);var b=a.i(25305);a.n(b)},56134,a=>{a.n(a.i(60119))}];
-
-//# sourceMappingURL=001x_next_dist_client_components_builtin_global-error_1at36dt.js.map
