@@ -1,0 +1,13 @@
+var R=require("../chunks/ssr/[turbopack]_runtime.js")("server/app/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__1t88s1u._.js")
+R.c("server/chunks/ssr/001x_next_dist_esm_build_templates_app-page_012kw3w.js")
+R.c("server/chunks/ssr/[root-of-the-server]__20nsd77._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__1sd3z6n._.js")
+R.c("server/chunks/ssr/Desktop_transparncia-palmital-main_src_03p05y2._.js")
+R.c("server/chunks/ssr/001x_next_dist_client_components_1j_-8yq._.js")
+R.c("server/chunks/ssr/001x_next_dist_client_components_builtin_forbidden_1wrf6zg.js")
+R.c("server/chunks/ssr/001x_next_dist_client_components_builtin_unauthorized_20lsxad.js")
+R.c("server/chunks/ssr/001x_next_dist_client_components_builtin_global-error_1at36dt.js")
+R.c("server/chunks/ssr/0im4_transparncia-palmital-main__next-internal_server_app_page_actions_0di_lrk.js")
+R.m(29206)
+module.exports=R.m(29206).exports

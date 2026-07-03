@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import Link from "next/link";
 import { Building2, Moon, Sun, Scale } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -35,7 +35,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
       {/* Cabeçalho */}
       <header className="border-b border-border bg-card">
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 sm:flex sm:justify-between">
-          <Link to="/" className="flex min-w-0 items-center gap-3">
+          <Link href="/" className="flex min-w-0 items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm">
               <Building2 className="h-6 w-6" />
             </div>
@@ -52,10 +52,8 @@ export function PortalLayout({ children }: { children: ReactNode }) {
           <div className="flex shrink-0 items-center gap-2">
             <nav className="hidden md:flex items-center gap-1 text-sm">
               <Link
-                to="/"
-                activeOptions={{ exact: true }}
-                className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground [&.active]:bg-muted [&.active]:text-foreground"
-                activeProps={{ className: "active" }}
+                href="/"
+                className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 Consulta Pública
               </Link>

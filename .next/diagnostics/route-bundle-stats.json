@@ -1,0 +1,59 @@
+[
+  {
+    "route": "/processos/[id]",
+    "firstLoadUncompressedJsBytes": 800509,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/12i2gcerqvfa-.js",
+      ".next/static/chunks/14gp1xd2wjnfu.js",
+      ".next/static/chunks/0urq6br3y_vhr.js",
+      ".next/static/chunks/1u6wi20eq61lc.js",
+      ".next/static/chunks/3x05w1z44axu-.js",
+      ".next/static/chunks/2zk1yau082-ra.js",
+      ".next/static/chunks/2g10d2741ombs.js",
+      ".next/static/chunks/3u42o26-zicxv.js",
+      ".next/static/chunks/turbopack-1dhhxq8ejcdmw.js"
+    ]
+  },
+  {
+    "route": "/",
+    "firstLoadUncompressedJsBytes": 791734,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/12i2gcerqvfa-.js",
+      ".next/static/chunks/14gp1xd2wjnfu.js",
+      ".next/static/chunks/3bwu4c8kxif86.js",
+      ".next/static/chunks/32tsth12as5rr.js",
+      ".next/static/chunks/3x05w1z44axu-.js",
+      ".next/static/chunks/2zk1yau082-ra.js",
+      ".next/static/chunks/2g10d2741ombs.js",
+      ".next/static/chunks/3u42o26-zicxv.js",
+      ".next/static/chunks/turbopack-1dhhxq8ejcdmw.js"
+    ]
+  },
+  {
+    "route": "/admin",
+    "firstLoadUncompressedJsBytes": 544693,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/12i2gcerqvfa-.js",
+      ".next/static/chunks/14gp1xd2wjnfu.js",
+      ".next/static/chunks/3bwu4c8kxif86.js",
+      ".next/static/chunks/3x05w1z44axu-.js",
+      ".next/static/chunks/2zk1yau082-ra.js",
+      ".next/static/chunks/2g10d2741ombs.js",
+      ".next/static/chunks/3u42o26-zicxv.js",
+      ".next/static/chunks/turbopack-1dhhxq8ejcdmw.js"
+    ]
+  },
+  {
+    "route": "/_not-found",
+    "firstLoadUncompressedJsBytes": 538867,
+    "firstLoadChunkPaths": [
+      ".next/static/chunks/12i2gcerqvfa-.js",
+      ".next/static/chunks/14gp1xd2wjnfu.js",
+      ".next/static/chunks/3x05w1z44axu-.js",
+      ".next/static/chunks/2zk1yau082-ra.js",
+      ".next/static/chunks/2g10d2741ombs.js",
+      ".next/static/chunks/3u42o26-zicxv.js",
+      ".next/static/chunks/turbopack-1dhhxq8ejcdmw.js"
+    ]
+  }
+]
