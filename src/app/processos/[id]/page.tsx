@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { get1DocProcessDetails } from "@/lib/onedoc";
-import { StatusBadge } from "@/app/page";
+import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 
 function formatDateBR(isoString: string) {
   if (!isoString) return "";
