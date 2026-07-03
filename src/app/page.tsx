@@ -181,7 +181,7 @@ export default function PaginaBuscaProcessos() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-4 md:flex-row">
             <FiltroSelecao
               label="Status da Tramitação"
               value={status}
@@ -259,11 +259,11 @@ export default function PaginaBuscaProcessos() {
         </div>
 
         {/* Cards (mobile) */}
-        <ul className="mt-6 grid gap-3 md:hidden">
+        <ul className="mt-6 grid gap-4 md:hidden list-none p-0 m-0">
           {results.map((p) => (
             <li
               key={p.id}
-              className="rounded-xl border border-border bg-card p-4 shadow-sm"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="font-mono text-sm font-semibold text-foreground">
@@ -277,21 +277,21 @@ export default function PaginaBuscaProcessos() {
               >
                 {p.assunto}
               </Link>
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <div>
-                  <dt className="uppercase tracking-wide text-[10px]">Abertura</dt>
+                  <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">Abertura</dt>
                   <dd className="mt-0.5 text-foreground">
                     {formatDateBR(p.dataAbertura)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="uppercase tracking-wide text-[10px]">Órgão atual</dt>
+                  <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">Órgão atual</dt>
                   <dd className="mt-0.5 text-foreground">{p.orgaoAtual}</dd>
                 </div>
               </dl>
               <Link
                 href={`/processos/${p.id}`}
-                className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary"
+                className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:text-emerald-500 dark:hover:text-emerald-400 hover:underline transition-colors"
               >
                 Ver detalhes <ArrowRight className="h-4 w-4" />
               </Link>
@@ -334,7 +334,7 @@ function FiltroSelecao({
   options: readonly string[];
 }) {
   return (
-    <label className="block text-xs font-medium text-muted-foreground">
+    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 w-full md:w-64">
       {label}
       <select
         value={value}
