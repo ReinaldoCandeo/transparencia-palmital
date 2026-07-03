@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { QueryClientProvider } from "@/lib/query-provider";
 
 export const metadata: Metadata = {
   title: "Portal da Transparência · Prefeitura de Palmital/SP",
@@ -9,16 +8,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="pt-BR">
-      <body>
-        <QueryClientProvider>
-          {children}
-        </QueryClientProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
