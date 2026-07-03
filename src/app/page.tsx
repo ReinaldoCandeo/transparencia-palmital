@@ -12,7 +12,6 @@ import {
   Building,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
-import { supabase } from "@/lib/supabase";
 
 function formatDateBR(isoString: string) {
   if (!isoString) return "";
@@ -43,6 +42,49 @@ export interface Processo {
   dataAbertura: string;
 }
 
+const mockProcessos: Processo[] = [
+  {
+    id: "1",
+    numero: "450",
+    ano: 2024,
+    assunto: "Edital de Licitação para Pavimentação da Av. Principal",
+    status: "Em Tramitação",
+    setor: "Obras",
+    orgaoAtual: "Secretaria de Obras",
+    dataAbertura: "2024-03-10T10:00:00Z",
+  },
+  {
+    id: "2",
+    numero: "123",
+    ano: 2024,
+    assunto: "Aquisição de Medicamentos de Uso Contínuo",
+    status: "Concluído",
+    setor: "Saúde",
+    orgaoAtual: "Secretaria de Saúde",
+    dataAbertura: "2024-02-15T14:30:00Z",
+  },
+  {
+    id: "3",
+    numero: "890",
+    ano: 2024,
+    assunto: "Reforma Estrutural na Escola Municipal",
+    status: "Em Tramitação",
+    setor: "Educação",
+    orgaoAtual: "Setor de Engenharia",
+    dataAbertura: "2024-03-12T09:15:00Z",
+  },
+  {
+    id: "4",
+    numero: "055",
+    ano: 2023,
+    assunto: "Contratação de Empresa para Coleta de Lixo",
+    status: "Arquivado",
+    setor: "Administração",
+    orgaoAtual: "Arquivo Geral",
+    dataAbertura: "2023-11-05T11:00:00Z",
+  }
+];
+
 export default function PaginaBuscaProcessos() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string | "Todos">("Todos");
@@ -51,23 +93,11 @@ export default function PaginaBuscaProcessos() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchData() {
-      // Realiza a consulta usando a chave anônima (anon_key) do Supabase.
-      // A segurança dos dados é garantida pelas políticas RLS (Row Level Security) 
-      // configuradas no banco, que permitem apenas leitura pública desta tabela.
-      const { data, error } = await supabase
-        .from("processos")
-        .select("*")
-        .order("dataAbertura", { ascending: false });
-
-      if (error) {
-        console.error("Erro ao carregar processos:", error);
-      } else {
-        setProcessos(data || []);
-      }
+    // Usando dados fictícios estáticos temporários para homologar o layout (evitar erros de Supabase Client no Vercel)
+    setTimeout(() => {
+      setProcessos(mockProcessos);
       setIsLoading(false);
-    }
-    fetchData();
+    }, 400); // Simulando delay de rede
   }, []);
 
   const results = useMemo(() => {
