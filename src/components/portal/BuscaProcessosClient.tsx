@@ -54,13 +54,20 @@ export default function BuscaProcessosClient({
 }) {
   const [q, setQ] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<string>("Todos");
-  const [processos, setProcessos] = useState<ProcessoPublico[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [processos, setProcessos] = useState<ProcessoPublico[]>(initialProcessos);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   useEffect(() => {
     setProcessos(initialProcessos);
     setIsLoading(false);
   }, [initialProcessos]);
+
+  // Reset para a primeira página quando o filtro ou busca mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q, statusFiltro]);
 
   // Lista de situações únicas para o filtro — derivada dos dados reais
   const statusDisponiveis = useMemo(() => {
@@ -84,6 +91,15 @@ export default function BuscaProcessosClient({
       );
     });
   }, [q, statusFiltro, processos]);
+
+  const totalPages = Math.ceil(results.length / itemsPerPage);
+
+  const paginatedResults = useMemo(() => {
+    return results.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+  }, [results, currentPage]);
 
   return (
     <PortalLayout>
@@ -175,7 +191,7 @@ export default function BuscaProcessosClient({
               </tr>
             </thead>
             <tbody>
-              {results.map((p) => (
+              {paginatedResults.map((p) => (
                 <tr
                   key={p.hash}
                   className="group border-t border-border transition-colors hover:bg-muted/40"
@@ -229,7 +245,7 @@ export default function BuscaProcessosClient({
 
         {/* Cards (mobile) */}
         <ul className="mt-6 grid gap-4 md:hidden list-none p-0 m-0">
-          {results.map((p) => (
+          {paginatedResults.map((p) => (
             <li
               key={p.hash}
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
@@ -271,6 +287,97 @@ export default function BuscaProcessosClient({
             </li>
           ))}
         </ul>
+
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
+            <p className="text-sm text-muted-foreground">
+              Exibindo de{" "}
+              <span className="font-semibold text-foreground">
+                {Math.min((currentPage - 1) * itemsPerPage + 1, results.length)}
+              </span>{" "}
+              a{" "}
+              <span className="font-semibold text-foreground">
+                {Math.min(currentPage * itemsPerPage, results.length)}
+              </span>{" "}
+              de{" "}
+              <span className="font-semibold text-foreground">
+                {results.length}
+              </span>{" "}
+              processos
+            </p>
+
+            <nav className="inline-flex items-center -space-x-px rounded-lg bg-card shadow-sm">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((c) => Math.max(c - 1, 1))}
+                className="rounded-l-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-muted-foreground"
+              >
+                Anterior
+              </button>
+              {[...Array(totalPages)].map((_, i) => {
+                const pageNumber = i + 1;
+                // Exibe no máximo 5 botões de página (com elipse para UX limpa)
+                if (
+                  totalPages > 7 &&
+                  pageNumber !== 1 &&
+                  pageNumber !== totalPages &&
+                  Math.abs(pageNumber - currentPage) > 1
+                ) {
+                  if (
+                    pageNumber === 2 &&
+                    currentPage > 3
+                  ) {
+                    return (
+                      <span
+                        key="ellipsis-start"
+                        className="border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  if (
+                    pageNumber === totalPages - 1 &&
+                    currentPage < totalPages - 2
+                  ) {
+                    return (
+                      <span
+                        key="ellipsis-end"
+                        className="border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  return null;
+                }
+
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => setCurrentPage(pageNumber)}
+                    aria-current={currentPage === pageNumber ? "page" : undefined}
+                    className={`border border-border px-3.5 py-2 text-sm font-medium transition-colors ${
+                      currentPage === pageNumber
+                        ? "z-10 bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((c) => Math.min(c + 1, totalPages))}
+                className="rounded-r-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-muted-foreground"
+              >
+                Próximo
+              </button>
+            </nav>
+          </div>
+        )}
 
         {/* Indicadores institucionais */}
         <div className="mt-12 grid gap-4 sm:grid-cols-3">

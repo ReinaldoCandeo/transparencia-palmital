@@ -1,4 +1,5 @@
-import { listarProcessos } from "@/lib/onedoc";
+import { revalidateTag } from "next/cache";
+import { sincronizarProcessos } from "@/lib/onedoc";
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("Authorization");
@@ -7,8 +8,12 @@ export async function POST(request: Request) {
     return Response.json({ error: "Não autorizado." }, { status: 401 });
   }
 
+  // Limpa os caches salvos de processos e detalhes
+  revalidateTag("processos", "max");
+  revalidateTag("processo-detalhe", "max");
+
   const inicio = Date.now();
-  const processos = await listarProcessos();
+  const processos = await sincronizarProcessos();
 
   const porAno = processos.reduce<Record<string, number>>((acc, p) => {
     acc[p.ano] = (acc[p.ano] ?? 0) + 1;

@@ -1,11 +1,15 @@
 import { unstable_cache } from "next/cache";
 import { SETORES_PERMITIDOS } from "@/config/setores";
+import fs from "fs";
+import path from "path";
 
 // ─── Interfaces do payload bruto da 1Doc ──────────────────────────────────
 
 interface OnedocMovimentacao {
   id_emissao_evento: string | null;
-  evento: string;
+  id_emissao?: string;
+  tipo_movimentacao_str?: string;
+  evento: string | null;
   data: string;
   hora: string;
   origem_id_setor: string;
@@ -114,13 +118,15 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     origem_setor: p.origem_setor,
     destino_setor: p.destino_setor,
     situacao_atual_str: p.situacao_atual_str,
-    movimentacoes: (p.movimentacoes ?? []).map((m) => ({
-      id: m.id_emissao_evento ?? `${m.data}-${m.hora}`,
-      evento: m.evento,
-      data: m.data,
-      hora: m.hora,
-      origem_setor: m.origem_setor,
-    })),
+    movimentacoes: (p.movimentacoes ?? [])
+      .filter((m) => m.data && m.data !== "0000-00-00")
+      .map((m) => ({
+        id: m.id_emissao_evento ?? m.id_emissao ?? `${m.data}-${m.hora}`,
+        evento: m.evento ?? m.tipo_movimentacao_str ?? "Despacho",
+        data: m.data,
+        hora: m.hora,
+        origem_setor: m.origem_setor ?? "",
+      })),
     anexos: (p.anexos ?? []).map((a) => {
       // Extração segura da extensão
       const partes = a.arquivo.split(".");
@@ -152,6 +158,11 @@ async function buscarTodasPaginas(
   const LIMITE_PAGINAS = 50;
 
   while (pagina <= LIMITE_PAGINAS) {
+    if (pagina > 1) {
+      // Pequeno delay para evitar rate limits (Erro 500) na API 1Doc
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+
     const url = `${baseUrl}${path}?pagina=${pagina}`;
 
     const res = await fetch(url, {
@@ -159,8 +170,7 @@ async function buscarTodasPaginas(
     });
 
     if (!res.ok) {
-      console.error(`1Doc API erro ${res.status} em ${url}`);
-      break;
+      throw new Error(`Erro ${res.status} ao consultar a API 1Doc na URL ${url}`);
     }
 
     const json: OnedocResponse = await res.json();
@@ -185,14 +195,56 @@ async function buscarTodasPaginas(
   return todos;
 }
 
-// ─── Funções Internas de Busca (sem Cache) ───────────────────────────────
+const CACHE_FILE_PATH = path.join(process.cwd(), ".next/processos-cache.json");
+
+function salvarCacheLocal(processos: ProcessoPublico[]) {
+  if (process.env.NODE_ENV === "development") {
+    try {
+      const dir = path.dirname(CACHE_FILE_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(processos, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Erro ao salvar cache local:", err);
+    }
+  }
+}
+
+function lerCacheLocal(): ProcessoPublico[] | null {
+  if (process.env.NODE_ENV === "development") {
+    try {
+      if (fs.existsSync(CACHE_FILE_PATH)) {
+        const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
+        return JSON.parse(content);
+      }
+    } catch (err) {
+      console.error("Erro ao ler cache local:", err);
+    }
+  }
+  return null;
+}
+
+export async function sincronizarProcessos(): Promise<ProcessoPublico[]> {
+  const todos = await buscarTodasPaginas("/processos-administrativos");
+  const sanitizados = todos.map(sanitizarProcesso);
+
+  salvarCacheLocal(sanitizados);
+
+  return sanitizados;
+}
 
 async function obterTodosProcessosInterno(): Promise<ProcessoPublico[]> {
-  const todos = await buscarTodasPaginas("/processos-administrativos");
-  
-  // Nota Arquitetural: Filtro desativado temporariamente para validação geral de dados.
-  // Reativar quando o critério final de filtragem (setor vs assunto) estiver definido.
-  return todos.map(sanitizarProcesso);
+  const cacheLocal = lerCacheLocal();
+  if (cacheLocal !== null) {
+    return cacheLocal;
+  }
+
+  return sincronizarProcessos();
+}
+
+interface OnedocDetalheResponse {
+  data: OnedocProcesso[];
 }
 
 async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null> {
@@ -207,8 +259,8 @@ async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null
 
   if (!res.ok) return null;
 
-  const json: OnedocResponse = await res.json();
-  const processo = json.data?.[0]?.emissoes?.[0] ?? null;
+  const json: OnedocDetalheResponse = await res.json();
+  const processo = json.data?.[0] ?? null;
   if (!processo) return null;
 
   return sanitizarProcesso(processo);
