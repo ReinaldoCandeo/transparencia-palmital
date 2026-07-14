@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Building2, Moon, Sun, Scale } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
