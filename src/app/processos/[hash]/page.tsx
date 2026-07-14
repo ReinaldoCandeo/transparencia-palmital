@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 function formatDateBR(dataStr: string, horaStr?: string) {
   if (!dataStr) return "";
   // A 1Doc retorna data no formato "DD/MM/YYYY" e hora como "HH:MM"
-  // Montamos um ISO aproximado para exibi+º+úo formatada
+  // Montamos um ISO aproximado para exibiÃ§Ã£o formatada
   const [dia, mes, ano] =
     dataStr.includes("/") ? dataStr.split("/") : [null, null, null];
   if (!dia || !mes || !ano) return dataStr; // fallback: exibe o valor bruto
@@ -42,7 +42,7 @@ export default async function DetalhesProcesso({
       <PortalLayout>
         <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
           <p className="text-muted-foreground">
-            Processo n+úo encontrado ou indispon+¡vel.
+            Processo nÃ£o encontrado ou indisponÃ­vel.
           </p>
           <Link href="/" className="text-primary hover:underline">
             Voltar para a busca
@@ -69,7 +69,7 @@ export default async function DetalhesProcesso({
               <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <h1 className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
-                    Autua+º+úo n-¦ {processo.num_formatado}
+                    AutuaÃ§Ã£o nÂº {processo.num_formatado}
                   </h1>
                   <p className="mt-2 text-lg font-medium text-muted-foreground">
                     {processo.assunto}
@@ -111,12 +111,12 @@ export default async function DetalhesProcesso({
               <div className="mb-4 flex items-start gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-800 dark:text-yellow-200">
                 <ShieldAlert className="h-5 w-5 shrink-0" />
                 <div className="text-sm">
-                  <p className="font-semibold">Aviso de Privacidade ÔÇö LGPD</p>
+                  <p className="font-semibold">Aviso de Privacidade â€” LGPD</p>
                   <p className="mt-1 opacity-90">
-                    Em conformidade com a Lei Geral de Prote+º+úo de Dados (Lei n-¦
-                    13.709/2018), os arquivos originais est+úo restritos a
+                    Em conformidade com a Lei Geral de ProteÃ§Ã£o de Dados (Lei nÂº
+                    13.709/2018), os arquivos originais estÃ£o restritos a
                     acessos autenticados. Este portal exibe apenas os metadados
-                    dos documentos comprobat+¦rios.
+                    dos documentos comprobatÃ³rios.
                   </p>
                 </div>
               </div>
@@ -141,7 +141,7 @@ export default async function DetalhesProcesso({
                           {doc.arquivo}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {doc.extensao.toUpperCase()} ÔÇó{" "}
+                          {doc.extensao.toUpperCase()} â€¢{" "}
                           {doc.tamanho_bytes > 0
                             ? `${(doc.tamanho_bytes / 1024).toFixed(0)} KB`
                             : doc.tipo_mime}
@@ -152,16 +152,16 @@ export default async function DetalhesProcesso({
                 </ul>
               ) : (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  Nenhum documento p+¦blico anexado a este processo.
+                  Nenhum documento pÃºblico anexado a este processo.
                 </p>
               )}
             </div>
 
-            {/* Hist+¦rico / Linha do tempo de movimenta+º+Áes */}
+            {/* HistÃ³rico / Linha do tempo de movimentaÃ§Ãµes */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
               <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Clock className="h-5 w-5 text-muted-foreground" /> Hist+¦rico de
-                Movimenta+º+Áes
+                <Clock className="h-5 w-5 text-muted-foreground" /> HistÃ³rico de
+                MovimentaÃ§Ãµes
               </h3>
 
               <div className="mt-8 flow-root">
@@ -206,7 +206,7 @@ export default async function DetalhesProcesso({
 
                   {processo.movimentacoes.length === 0 && (
                     <p className="text-sm text-muted-foreground pb-8">
-                      Nenhuma movimenta+º+úo registrada.
+                      Nenhuma movimentaÃ§Ã£o registrada.
                     </p>
                   )}
                 </ul>
