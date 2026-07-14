@@ -1,67 +1,281 @@
-"use server";
+import { unstable_cache } from "next/cache";
+import { SETORES_PERMITIDOS } from "@/config/setores";
+import fs from "fs";
+import path from "path";
 
-export async function get1DocProcesses() {
+// ─── Interfaces do payload bruto da 1Doc ──────────────────────────────────
+
+interface OnedocMovimentacao {
+  id_emissao_evento: string | null;
+  id_emissao?: string;
+  tipo_movimentacao_str?: string;
+  evento: string | null;
+  data: string;
+  hora: string;
+  origem_id_setor: string;
+  origem_setor: string;
+  origem_id_usuario: string;
+  origem_usuario: string; // recebido, mas omitido na saída pública (LGPD)
+}
+
+interface OnedocAnexo {
+  id_anexo: string;
+  arquivo: string;      // nome completo do arquivo: "REQUIS_901.pdf"
+  tamanho: string;      // tamanho em bytes como string
+  tipo: string;         // MIME type: "application/pdf"
+  url: string;          // URL direta — NUNCA exposta na saída pública
+  url_original: string; // idem
+}
+
+interface OnedocProcesso {
+  id_emissao?: string;
+  num: number;           // número do processo (number na API)
+  ano: number;           // ano do processo (number na API)
+  num_formatado: string; // ex: "2.504/2026"
+  assunto: string;
+  conteudo: string;
+  resumo?: string;
+  data: string;
+  hora: string;
+  origem_id_setor: string;
+  origem_setor: string;
+  origem_usuario: string;
+  destino_id_setor: string;
+  destino_setor: string;
+  situacao_atual_str: string;
+  hash: string;
+  total_despachos?: string;
+  movimentacoes?: OnedocMovimentacao[];
+  anexos?: OnedocAnexo[];
+}
+
+interface OnedocPagina {
+  num_pagina: number;
+  total: number;         // total global de registros na 1Doc
+  emissoes: OnedocProcesso[];
+}
+
+interface OnedocResponse {
+  data: OnedocPagina[]; // data[0] contém a página
+}
+
+// ─── Interfaces públicas (sanitizadas) ───────────────────────────────────
+
+export interface MovimentacaoPublica {
+  id: string;
+  evento: string;
+  data: string;
+  hora: string;
+  origem_setor: string;
+}
+
+export interface AnexoPublico {
+  arquivo: string;      // nome completo: "REQUIS_901.pdf"
+  extensao: string;     // derivado: "pdf"
+  tamanho_bytes: number;
+  tipo_mime: string;    // "application/pdf"
+}
+
+export interface ProcessoPublico {
+  hash: string;
+  num: string;
+  ano: string;
+  num_formatado: string;
+  assunto: string;
+  data: string;
+  hora: string;
+  origem_setor: string;
+  destino_setor: string;
+  situacao_atual_str: string;
+  movimentacoes: MovimentacaoPublica[];
+  anexos: AnexoPublico[];
+}
+
+// ─── Configuração ──────────────────────────────────────────────────────────
+
+function getConfig(): { baseUrl: string; authHash: string } {
   const baseUrl = process.env.ONEDOC_BASE_URL;
-  const apiKey = process.env.ONEDOC_API_KEY;
-
-  if (!baseUrl || !apiKey) {
-    console.warn("Chaves da 1Doc não configuradas no .env.local.");
-    return [];
+  const authHash = process.env.ONEDOC_AUTH_HASH;
+  if (!baseUrl || !authHash) {
+    throw new Error(
+      "Variáveis de ambiente ONEDOC_BASE_URL e ONEDOC_AUTH_HASH são obrigatórias"
+    );
   }
+  return { baseUrl, authHash };
+}
 
-  try {
-    const response = await fetch(`${baseUrl}/processos-administrativos`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      // Desabilita o cache agressivo para garantir leitura em tempo real
-      cache: "no-store", 
-    });
+// ─── Sanitização ──────────────────────────────────────────────────────────
 
-    if (!response.ok) {
-      console.error(`Erro na API 1Doc: ${response.status} ${response.statusText}`);
-      return [];
+function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
+  return {
+    hash: p.hash,
+    num: String(p.num),
+    ano: String(p.ano),
+    num_formatado: p.num_formatado,
+    assunto: p.assunto,
+    data: p.data,
+    hora: p.hora,
+    origem_setor: p.origem_setor,
+    destino_setor: p.destino_setor,
+    situacao_atual_str: p.situacao_atual_str,
+    movimentacoes: (p.movimentacoes ?? [])
+      .filter((m) => m.data && m.data !== "0000-00-00")
+      .map((m) => ({
+        id: m.id_emissao_evento ?? m.id_emissao ?? `${m.data}-${m.hora}`,
+        evento: m.evento ?? m.tipo_movimentacao_str ?? "Despacho",
+        data: m.data,
+        hora: m.hora,
+        origem_setor: m.origem_setor ?? "",
+      })),
+    anexos: (p.anexos ?? []).map((a) => {
+      // Extração segura da extensão
+      const partes = a.arquivo.split(".");
+      const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
+      return {
+        arquivo: a.arquivo,
+        extensao: extensao.toLowerCase(),
+        tamanho_bytes: Number(a.tamanho),
+        tipo_mime: a.tipo,
+      };
+    }),
+  };
+}
+
+// ─── Paginação com Trava contra Timeout ───────────────────────────────────
+
+/**
+ * Percorre as páginas da 1Doc respeitando um limite de segurança (timeout)
+ */
+async function buscarTodasPaginas(
+  path: string
+): Promise<OnedocProcesso[]> {
+  const { baseUrl, authHash } = getConfig();
+  const todos: OnedocProcesso[] = [];
+  let pagina = 1;
+  let totalEsperado: number | null = null;
+  
+  // Limite rígido de 50 páginas (1000 processos) para evitar timeouts na Vercel/Node
+  const LIMITE_PAGINAS = 50;
+
+  while (pagina <= LIMITE_PAGINAS) {
+    if (pagina > 1) {
+      // Pequeno delay para evitar rate limits (Erro 500) na API 1Doc
+      await new Promise((resolve) => setTimeout(resolve, 800));
     }
 
-    const data = await response.json();
-    
-    // Assumindo que a resposta venha em 'data' ou seja o próprio array.
-    // O mapeamento exato dos campos deve ser alinhado com o payload real da 1Doc.
-    return Array.isArray(data) ? data : data.data || [];
-  } catch (error) {
-    console.error("Erro ao conectar com a API 1Doc:", error);
-    return [];
+    const url = `${baseUrl}${path}?pagina=${pagina}`;
+
+    const res = await fetch(url, {
+      headers: { "X-Auth-Hash": authHash },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erro ${res.status} ao consultar a API 1Doc na URL ${url}`);
+    }
+
+    const json: OnedocResponse = await res.json();
+    const paginaDados = json.data?.[0];
+
+    if (!paginaDados || !Array.isArray(paginaDados.emissoes) || paginaDados.emissoes.length === 0) {
+      break;
+    }
+
+    if (totalEsperado === null) {
+      totalEsperado = paginaDados.total;
+    }
+
+    todos.push(...paginaDados.emissoes);
+    pagina++;
+
+    if (totalEsperado !== null && todos.length >= totalEsperado) {
+      break;
+    }
+  }
+
+  return todos;
+}
+
+const CACHE_FILE_PATH = path.join(process.cwd(), ".next/processos-cache.json");
+
+function salvarCacheLocal(processos: ProcessoPublico[]) {
+  if (process.env.NODE_ENV === "development") {
+    try {
+      const dir = path.dirname(CACHE_FILE_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(processos, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Erro ao salvar cache local:", err);
+    }
   }
 }
 
-export async function get1DocProcessDetails(id: string) {
-  const baseUrl = process.env.ONEDOC_BASE_URL;
-  const apiKey = process.env.ONEDOC_API_KEY;
-
-  if (!baseUrl || !apiKey) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(`${baseUrl}/processos-administrativos/${id}`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store", 
-    });
-
-    if (!response.ok) {
-      return null;
+function lerCacheLocal(): ProcessoPublico[] | null {
+  if (process.env.NODE_ENV === "development") {
+    try {
+      if (fs.existsSync(CACHE_FILE_PATH)) {
+        const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
+        return JSON.parse(content);
+      }
+    } catch (err) {
+      console.error("Erro ao ler cache local:", err);
     }
-
-    const data = await response.json();
-    return data.data || data || null;
-  } catch (error) {
-    console.error("Erro ao buscar detalhes no 1Doc:", error);
-    return null;
   }
+  return null;
 }
+
+export async function sincronizarProcessos(): Promise<ProcessoPublico[]> {
+  const todos = await buscarTodasPaginas("/processos-administrativos");
+  const sanitizados = todos.map(sanitizarProcesso);
+
+  salvarCacheLocal(sanitizados);
+
+  return sanitizados;
+}
+
+async function obterTodosProcessosInterno(): Promise<ProcessoPublico[]> {
+  const cacheLocal = lerCacheLocal();
+  if (cacheLocal !== null) {
+    return cacheLocal;
+  }
+
+  return sincronizarProcessos();
+}
+
+interface OnedocDetalheResponse {
+  data: OnedocProcesso[];
+}
+
+async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null> {
+  const { baseUrl, authHash } = getConfig();
+
+  const res = await fetch(
+    `${baseUrl}/processos-administrativos/${hash}/despachos?pagina=1`,
+    {
+      headers: { "X-Auth-Hash": authHash },
+    }
+  );
+
+  if (!res.ok) return null;
+
+  const json: OnedocDetalheResponse = await res.json();
+  const processo = json.data?.[0] ?? null;
+  if (!processo) return null;
+
+  return sanitizarProcesso(processo);
+}
+
+// ─── Exportações com Cache (Escopo Global para Evitar Memory Leaks) ───────
+
+export const listarProcessos = unstable_cache(
+  async () => obterTodosProcessosInterno(),
+  ["processos-list"],
+  { revalidate: 300, tags: ["processos"] }
+);
+
+export const buscarDetalhe = unstable_cache(
+  async (hash: string) => obterDetalheInterno(hash),
+  ["processo-detalhe"],
+  { revalidate: 300 }
+);

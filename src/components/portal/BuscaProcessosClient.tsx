@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Search,
-  Filter,
   ArrowRight,
   FileText,
   ShieldCheck,
@@ -12,75 +11,95 @@ import {
   Building,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
+import type { ProcessoPublico } from "@/lib/onedoc";
 
-function formatDateBR(isoString: string) {
-  if (!isoString) return "";
-  const d = new Date(isoString);
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function formatDateBR(dataStr: string) {
+  if (!dataStr) return "";
+  if (!dataStr.includes("/")) return dataStr;
+  const [dia, mes, ano] = dataStr.split("/");
+  return `${dia}/${mes}/${ano}`;
 }
 
-const STATUSES = ["Em Tramitação", "Concluído", "Arquivado"];
-const SETORES = ["Saúde", "Obras", "Administração", "Educação", "Fazenda"];
 const STATUS_COLORS: Record<string, string> = {
   "Em Tramitação": "border-blue-500/20 bg-blue-500/10 text-blue-500",
   Concluído: "border-green-500/20 bg-green-500/10 text-green-500",
-  Arquivado: "border-muted-foreground/20 bg-muted/50 text-muted-foreground",
+  Arquivado:
+    "border-muted-foreground/20 bg-muted/50 text-muted-foreground",
 };
 
-export interface Processo {
-  id: string;
-  numero: string;
-  ano: number;
-  assunto: string;
-  status: string;
-  setor: string;
-  orgaoAtual: string;
-  dataAbertura: string;
+// ─── StatusBadge (exportado — usado em processos/[hash]/page.tsx) ──────────
+
+export function StatusBadge({ status }: { status: string }) {
+  const color =
+    STATUS_COLORS[status] ??
+    "border-gray-500/20 bg-gray-500/10 text-gray-500";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {status}
+    </span>
+  );
 }
 
-export default function BuscaProcessosClient({ initialProcessos }: { initialProcessos: any[] }) {
+// ─── Componente principal ─────────────────────────────────────────────────
+
+export default function BuscaProcessosClient({
+  initialProcessos,
+}: {
+  initialProcessos: ProcessoPublico[];
+}) {
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<string | "Todos">("Todos");
-  const [setor, setSetor] = useState<string | "Todos">("Todos");
-  const [processos, setProcessos] = useState<Processo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [statusFiltro, setStatusFiltro] = useState<string>("Todos");
+  const [processos, setProcessos] = useState<ProcessoPublico[]>(initialProcessos);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   useEffect(() => {
-    // Transforma os dados brutos da 1Doc na interface esperada pela UI
-    const mapeados: Processo[] = initialProcessos.map((p: any) => ({
-      id: String(p.id || p.id_documento || Math.random()),
-      numero: String(p.numero || p.numero_processo || "N/A"),
-      ano: Number(p.ano || new Date().getFullYear()),
-      assunto: String(p.assunto || p.nome || "Assunto Não Informado"),
-      status: String(p.status || p.situacao || "Em Tramitação"),
-      setor: String(p.setor || p.departamento || "Geral"),
-      orgaoAtual: String(p.orgaoAtual || p.orgao || "Administração"),
-      dataAbertura: String(p.dataAbertura || p.data_cadastro || new Date().toISOString()),
-    }));
-    setProcessos(mapeados);
+    setProcessos(initialProcessos);
     setIsLoading(false);
   }, [initialProcessos]);
+
+  // Reset para a primeira página quando o filtro ou busca mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q, statusFiltro]);
+
+  // Lista de situações únicas para o filtro — derivada dos dados reais
+  const statusDisponiveis = useMemo(() => {
+    const unique = [...new Set(processos.map((p) => p.situacao_atual_str))];
+    return unique.sort();
+  }, [processos]);
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
     return processos.filter((p) => {
-      if (status !== "Todos" && p.status !== status) return false;
-      if (setor !== "Todos" && p.setor !== setor) return false;
+      if (statusFiltro !== "Todos" && p.situacao_atual_str !== statusFiltro)
+        return false;
       if (!query) return true;
       return (
-        p.numero?.includes(query) ||
-        String(p.ano).includes(query) ||
-        `${p.numero}/${p.ano}`.includes(query) ||
+        p.num?.toString().includes(query) ||
+        p.ano?.toString().includes(query) ||
+        p.num_formatado?.toLowerCase().includes(query) ||
         p.assunto?.toLowerCase().includes(query) ||
-        p.orgaoAtual?.toLowerCase().includes(query) ||
-        p.setor?.toLowerCase().includes(query)
+        p.destino_setor?.toLowerCase().includes(query) ||
+        p.origem_setor?.toLowerCase().includes(query)
       );
     });
-  }, [q, status, setor, processos]);
+  }, [q, statusFiltro, processos]);
+
+  const totalPages = Math.ceil(results.length / itemsPerPage);
+
+  const paginatedResults = useMemo(() => {
+    return results.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+  }, [results, currentPage]);
 
   return (
     <PortalLayout>
@@ -105,9 +124,9 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
               Consulta de Processos Administrativos
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-primary-foreground/85 sm:text-base">
-              Acompanhe a tramitação completa dos processos da Prefeitura Municipal
-              com rastro auditável, em conformidade com a Nova Lei de Licitações e a
-              Lei de Acesso à Informação.
+              Acompanhe a tramitação completa dos processos da Prefeitura
+              Municipal com rastro auditável, em conformidade com a Nova Lei de
+              Licitações e a Lei de Acesso à Informação.
             </p>
 
             <div className="mt-8">
@@ -142,22 +161,18 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
               Resultados da consulta
             </h3>
             <p className="text-sm text-muted-foreground">
-              {isLoading ? "Carregando..." : `${results.length} processo(s) encontrado(s)`}
+              {isLoading
+                ? "Carregando..."
+                : `${results.length} processo(s) encontrado(s)`}
             </p>
           </div>
 
           <div className="flex flex-col gap-4 md:flex-row">
             <FiltroSelecao
-              label="Status da Tramitação"
-              value={status}
-              onChange={(v) => setStatus(v as string | "Todos")}
-              options={["Todos", ...STATUSES]}
-            />
-            <FiltroSelecao
-              label="Setor Responsável"
-              value={setor}
-              onChange={(v) => setSetor(v as string | "Todos")}
-              options={["Todos", ...SETORES]}
+              label="Situação"
+              value={statusFiltro}
+              onChange={setStatusFiltro}
+              options={["Todos", ...statusDisponiveis]}
             />
           </div>
         </div>
@@ -169,42 +184,44 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
               <tr>
                 <th className="px-4 py-3">Número/Ano</th>
                 <th className="px-4 py-3">Assunto</th>
-                <th className="px-4 py-3">Data de abertura</th>
-                <th className="px-4 py-3">Órgão atual</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Data</th>
+                <th className="px-4 py-3">Setor atual</th>
+                <th className="px-4 py-3">Situação</th>
                 <th className="px-4 py-3 sr-only">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {results.map((p) => (
+              {paginatedResults.map((p) => (
                 <tr
-                  key={p.id}
+                  key={p.hash}
                   className="group border-t border-border transition-colors hover:bg-muted/40"
                 >
                   <td className="px-4 py-4 font-mono text-sm font-semibold text-foreground">
-                    {p.numero}/{p.ano}
+                    {p.num_formatado}
                   </td>
                   <td className="px-4 py-4">
                     <Link
-                      href={`/processos/${p.id}`}
+                      href={`/processos/${p.hash}`}
                       className="line-clamp-2 font-medium text-foreground hover:text-primary"
                     >
                       {p.assunto}
                     </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Setor: {p.setor}
+                      Origem: {p.origem_setor}
                     </p>
                   </td>
                   <td className="px-4 py-4 text-muted-foreground">
-                    {formatDateBR(p.dataAbertura)}
+                    {formatDateBR(p.data)}
                   </td>
-                  <td className="px-4 py-4 text-muted-foreground">{p.orgaoAtual}</td>
+                  <td className="px-4 py-4 text-muted-foreground">
+                    {p.destino_setor}
+                  </td>
                   <td className="px-4 py-4">
-                    <StatusBadge status={p.status} />
+                    <StatusBadge status={p.situacao_atual_str} />
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Link
-                      href={`/processos/${p.id}`}
+                      href={`/processos/${p.hash}`}
                       className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                     >
                       Detalhes <ArrowRight className="h-4 w-4" />
@@ -214,7 +231,10 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
               ))}
               {!isLoading && results.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-10 text-center text-muted-foreground"
+                  >
                     Nenhum processo encontrado para os filtros informados.
                   </td>
                 </tr>
@@ -225,37 +245,41 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
 
         {/* Cards (mobile) */}
         <ul className="mt-6 grid gap-4 md:hidden list-none p-0 m-0">
-          {results.map((p) => (
+          {paginatedResults.map((p) => (
             <li
-              key={p.id}
+              key={p.hash}
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="font-mono text-sm font-semibold text-foreground">
-                  {p.numero}/{p.ano}
+                  {p.num_formatado}
                 </span>
-                <StatusBadge status={p.status} />
+                <StatusBadge status={p.situacao_atual_str} />
               </div>
               <Link
-                href={`/processos/${p.id}`}
+                href={`/processos/${p.hash}`}
                 className="mt-2 block font-medium text-foreground hover:text-primary"
               >
                 {p.assunto}
               </Link>
               <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <div>
-                  <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">Abertura</dt>
+                  <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">
+                    Data
+                  </dt>
                   <dd className="mt-0.5 text-foreground">
-                    {formatDateBR(p.dataAbertura)}
+                    {formatDateBR(p.data)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">Órgão atual</dt>
-                  <dd className="mt-0.5 text-foreground">{p.orgaoAtual}</dd>
+                  <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">
+                    Setor atual
+                  </dt>
+                  <dd className="mt-0.5 text-foreground">{p.destino_setor}</dd>
                 </div>
               </dl>
               <Link
-                href={`/processos/${p.id}`}
+                href={`/processos/${p.hash}`}
                 className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:text-emerald-500 dark:hover:text-emerald-400 hover:underline transition-colors"
               >
                 Ver detalhes <ArrowRight className="h-4 w-4" />
@@ -263,6 +287,97 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
             </li>
           ))}
         </ul>
+
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
+            <p className="text-sm text-muted-foreground">
+              Exibindo de{" "}
+              <span className="font-semibold text-foreground">
+                {Math.min((currentPage - 1) * itemsPerPage + 1, results.length)}
+              </span>{" "}
+              a{" "}
+              <span className="font-semibold text-foreground">
+                {Math.min(currentPage * itemsPerPage, results.length)}
+              </span>{" "}
+              de{" "}
+              <span className="font-semibold text-foreground">
+                {results.length}
+              </span>{" "}
+              processos
+            </p>
+
+            <nav className="inline-flex items-center -space-x-px rounded-lg bg-card shadow-sm">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((c) => Math.max(c - 1, 1))}
+                className="rounded-l-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-muted-foreground"
+              >
+                Anterior
+              </button>
+              {[...Array(totalPages)].map((_, i) => {
+                const pageNumber = i + 1;
+                // Exibe no máximo 5 botões de página (com elipse para UX limpa)
+                if (
+                  totalPages > 7 &&
+                  pageNumber !== 1 &&
+                  pageNumber !== totalPages &&
+                  Math.abs(pageNumber - currentPage) > 1
+                ) {
+                  if (
+                    pageNumber === 2 &&
+                    currentPage > 3
+                  ) {
+                    return (
+                      <span
+                        key="ellipsis-start"
+                        className="border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  if (
+                    pageNumber === totalPages - 1 &&
+                    currentPage < totalPages - 2
+                  ) {
+                    return (
+                      <span
+                        key="ellipsis-end"
+                        className="border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  return null;
+                }
+
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => setCurrentPage(pageNumber)}
+                    aria-current={currentPage === pageNumber ? "page" : undefined}
+                    className={`border border-border px-3.5 py-2 text-sm font-medium transition-colors ${
+                      currentPage === pageNumber
+                        ? "z-10 bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((c) => Math.min(c + 1, totalPages))}
+                className="rounded-r-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-muted-foreground"
+              >
+                Próximo
+              </button>
+            </nav>
+          </div>
+        )}
 
         {/* Indicadores institucionais */}
         <div className="mt-12 grid gap-4 sm:grid-cols-3">
@@ -273,19 +388,23 @@ export default function BuscaProcessosClient({ initialProcessos }: { initialProc
           />
           <CartaoIndicador
             icon={<Clock3 className="h-5 w-5" />}
-            label="Aguardando Análise"
-            value={processos.filter((p) => p.status === "Em Tramitação").length.toString()}
+            label="Em Tramitação"
+            value={processos
+              .filter((p) => p.situacao_atual_str === "Em Tramitação")
+              .length.toString()}
           />
           <CartaoIndicador
             icon={<Building className="h-5 w-5" />}
-            label="Órgãos Integrados"
-            value={SETORES.length.toString()}
+            label="Setor Responsável"
+            value="Terceiro Setor"
           />
         </div>
       </section>
     </PortalLayout>
   );
 }
+
+// ─── Subcomponentes ───────────────────────────────────────────────────────
 
 function FiltroSelecao({
   label,
@@ -313,18 +432,6 @@ function FiltroSelecao({
         ))}
       </select>
     </label>
-  );
-}
-
-export function StatusBadge({ status }: { status: string }) {
-  const color = STATUS_COLORS[status] || "border-gray-500/20 bg-gray-500/10 text-gray-500";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {status}
-    </span>
   );
 }
 
