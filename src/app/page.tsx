@@ -10,17 +10,15 @@ export default async function PaginaBuscaProcessos({
 }) {
   const params = await searchParams;
   
-  // Extrai filtros da URL, usando defaults amigáveis
+  // Extrai filtros da URL
   const pagina = params.pagina ? parseInt(params.pagina as string, 10) : 1;
-  const ano = (params.ano as string) || new Date().getFullYear().toString();
-  const mes = params.mes as string | undefined;
 
   let processos: ProcessoPublico[] = [];
   let paginaAtual = 1;
   let totalPaginas = 1;
 
   try {
-    const resultado = await buscarProcessosPaginado(pagina, ano, mes);
+    const resultado = await buscarProcessosPaginado(pagina);
     processos = resultado.processos;
     paginaAtual = resultado.paginaAtual;
     totalPaginas = resultado.totalPaginas;
@@ -32,9 +30,7 @@ export default async function PaginaBuscaProcessos({
     <BuscaProcessosClient 
       processos={processos} 
       paginaAtual={paginaAtual} 
-      totalPaginas={totalPaginas} 
-      anoFiltro={ano}
-      mesFiltro={mes || ""}
+      totalPaginas={totalPaginas}
     />
   );
 }

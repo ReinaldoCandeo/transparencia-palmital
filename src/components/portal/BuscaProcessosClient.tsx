@@ -51,23 +51,18 @@ export default function BuscaProcessosClient({
   processos,
   paginaAtual,
   totalPaginas,
-  anoFiltro,
-  mesFiltro,
 }: {
   processos: ProcessoPublico[];
   paginaAtual: number;
   totalPaginas: number;
-  anoFiltro: string;
-  mesFiltro: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Estado da Busca Direta Exata
   const [buscaDiretaNum, setBuscaDiretaNum] = useState("");
   const [buscaDiretaAno, setBuscaDiretaAno] = useState(
-    anoFiltro || new Date().getFullYear().toString()
+    new Date().getFullYear().toString()
   );
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
@@ -90,18 +85,6 @@ export default function BuscaProcessosClient({
     { value: "11", label: "Novembro" },
     { value: "12", label: "Dezembro" },
   ];
-
-  const updateFilters = (novoAno: string, novoMes: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("pagina", "1");
-    if (novoAno) params.set("ano", novoAno);
-    else params.delete("ano");
-    
-    if (novoMes) params.set("mes", novoMes);
-    else params.delete("mes");
-    
-    router.push(`${pathname}?${params.toString()}`);
-  };
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -215,30 +198,15 @@ export default function BuscaProcessosClient({
 
       {/* Listagem Exploratória (SSR Paginada) */}
       <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mt-12 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
-              <FileText className="w-5 h-5 text-muted-foreground" />
-              Listagem Geral
+            <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Listagem Geral (Últimos Processos)
             </h3>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="mt-1 text-sm text-muted-foreground">
               Página {paginaAtual} de {totalPaginas}
             </p>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <FiltroSelecao
-              label="Ano"
-              value={anoFiltro}
-              onChange={(novoAno) => updateFilters(novoAno, mesFiltro)}
-              options={anosDisponiveis.map(a => ({ value: a, label: a }))}
-            />
-            <FiltroSelecao
-              label="Mês"
-              value={mesFiltro}
-              onChange={(novoMes) => updateFilters(anoFiltro, novoMes)}
-              options={meses}
-            />
           </div>
         </div>
 

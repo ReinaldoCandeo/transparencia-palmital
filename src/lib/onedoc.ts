@@ -150,16 +150,14 @@ export interface PaginaResult {
 }
 
 async function obterProcessosPaginadoInterno(
-  pagina: number,
-  ano?: string,
-  mes?: string
+  pagina: number
 ): Promise<PaginaResult> {
   try {
     const { baseUrl, authHash } = getConfig();
     
     let url = `${baseUrl}/processos-administrativos?pagina=${pagina}`;
-    if (ano) url += `&ano=${ano}`;
-    if (mes) url += `&mes=${mes}`;
+    // A API da 1Doc rejeita os parâmetros 'ano' e 'mes' com erro 400.
+    // Se quisermos filtrar por ano/mês no frontend, teríamos que filtrar em memória.
 
     const res = await fetch(url, {
       headers: { "X-Auth-Hash": authHash },
@@ -256,8 +254,8 @@ async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null
 // ─── Exportações com Cache (Escopo Global para Evitar Memory Leaks) ───────
 
 export const buscarProcessosPaginado = unstable_cache(
-  async (pagina: number, ano?: string, mes?: string) => 
-    obterProcessosPaginadoInterno(pagina, ano, mes),
+  async (pagina: number) => 
+    obterProcessosPaginadoInterno(pagina),
   ["processos-paginados"],
   { revalidate: 300, tags: ["processos"] }
 );
