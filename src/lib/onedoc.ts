@@ -141,141 +141,135 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
   };
 }
 
-// ─── Paginação com Trava contra Timeout ───────────────────────────────────
+// ─── Paginação SSR (Server-Side) ──────────────────────────────────────────
 
-/**
- * Percorre as páginas da 1Doc respeitando um limite de segurança (timeout)
- */
-async function buscarTodasPaginas(
-  path: string
-): Promise<OnedocProcesso[]> {
-  const { baseUrl, authHash } = getConfig();
-  const todos: OnedocProcesso[] = [];
-  let pagina = 1;
-  let totalEsperado: number | null = null;
-  
-  // Limite rígido de 50 páginas (1000 processos) para evitar timeouts na Vercel/Node
-  const LIMITE_PAGINAS = 50;
+export interface PaginaResult {
+  processos: ProcessoPublico[];
+  paginaAtual: number;
+  totalPaginas: number;
+}
 
-  while (pagina <= LIMITE_PAGINAS) {
-    if (pagina > 1) {
-      // Pequeno delay para evitar rate limits (Erro 500) na API 1Doc
-      await new Promise((resolve) => setTimeout(resolve, 800));
-    }
-
-    const url = `${baseUrl}${path}?pagina=${pagina}`;
+async function obterProcessosPaginadoInterno(
+  pagina: number,
+  ano?: string,
+  mes?: string
+): Promise<PaginaResult> {
+  try {
+    const { baseUrl, authHash } = getConfig();
+    
+    let url = `${baseUrl}/processos-administrativos?pagina=${pagina}`;
+    if (ano) url += `&ano=${ano}`;
+    if (mes) url += `&mes=${mes}`;
 
     const res = await fetch(url, {
       headers: { "X-Auth-Hash": authHash },
     });
 
     if (!res.ok) {
-      throw new Error(`Erro ${res.status} ao consultar a API 1Doc na URL ${url}`);
+      console.error(`[1Doc] Erro ${res.status} ao consultar API na URL ${url}`);
+      return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
     }
 
     const json: OnedocResponse = await res.json();
     const paginaDados = json.data?.[0];
 
-    if (!paginaDados || !Array.isArray(paginaDados.emissoes) || paginaDados.emissoes.length === 0) {
-      break;
+    if (!paginaDados || !Array.isArray(paginaDados.emissoes)) {
+      return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
     }
 
-    if (totalEsperado === null) {
-      totalEsperado = paginaDados.total;
-    }
+    const processos = paginaDados.emissoes.map(sanitizarProcesso);
+    // Assumindo 15 itens por página conforme padrão anterior da 1Doc
+    const totalPaginas = Math.ceil((paginaDados.total || 0) / 15) || 1;
 
-    todos.push(...paginaDados.emissoes);
-    pagina++;
-
-    if (totalEsperado !== null && todos.length >= totalEsperado) {
-      break;
-    }
-  }
-
-  return todos;
-}
-
-const CACHE_FILE_PATH = path.join(process.cwd(), ".next/processos-cache.json");
-
-function salvarCacheLocal(processos: ProcessoPublico[]) {
-  if (process.env.NODE_ENV === "development") {
-    try {
-      const dir = path.dirname(CACHE_FILE_PATH);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(processos, null, 2), "utf-8");
-    } catch (err) {
-      console.error("Erro ao salvar cache local:", err);
-    }
+    return { processos, paginaAtual: pagina, totalPaginas };
+  } catch (err) {
+    console.error("[1Doc] Falha na paginação:", err);
+    return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
   }
 }
 
-function lerCacheLocal(): ProcessoPublico[] | null {
-  if (process.env.NODE_ENV === "development") {
-    try {
-      if (fs.existsSync(CACHE_FILE_PATH)) {
-        const content = fs.readFileSync(CACHE_FILE_PATH, "utf-8");
-        return JSON.parse(content);
-      }
-    } catch (err) {
-      console.error("Erro ao ler cache local:", err);
+// ─── Busca Exata por Número e Ano (Proxy Direct Search) ───────────────────
+
+async function obterHashPorNumeroInterno(
+  numero: string,
+  ano: string
+): Promise<string | null> {
+  try {
+    const { baseUrl, authHash } = getConfig();
+    // Endpoint documentado no Swagger da 1Doc
+    const url = `${baseUrl}/processos-administrativos/busca-por-numero?numero=${numero}&ano=${ano}`;
+    
+    const res = await fetch(url, {
+      headers: { "X-Auth-Hash": authHash },
+    });
+
+    if (!res.ok) {
+      console.error(`[1Doc] Erro ${res.status} ao buscar número exato: ${url}`);
+      return null;
     }
+
+    const json = await res.json();
+    
+    // A 1Doc pode retornar um objeto direto ou dentro de um array `data`
+    const processo = json.data?.[0] || json;
+    if (processo && processo.hash) {
+      return processo.hash;
+    }
+    
+    return null;
+  } catch (err) {
+    console.error(`[1Doc] Falha ao buscar numero ${numero}/${ano}:`, err);
+    return null;
   }
-  return null;
 }
 
-export async function sincronizarProcessos(): Promise<ProcessoPublico[]> {
-  const todos = await buscarTodasPaginas("/processos-administrativos");
-  const sanitizados = todos.map(sanitizarProcesso);
-
-  salvarCacheLocal(sanitizados);
-
-  return sanitizados;
-}
-
-async function obterTodosProcessosInterno(): Promise<ProcessoPublico[]> {
-  const cacheLocal = lerCacheLocal();
-  if (cacheLocal !== null) {
-    return cacheLocal;
-  }
-
-  return sincronizarProcessos();
-}
+// ─── Detalhes do Processo ─────────────────────────────────────────────────
 
 interface OnedocDetalheResponse {
   data: OnedocProcesso[];
 }
 
 async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null> {
-  const { baseUrl, authHash } = getConfig();
+  try {
+    const { baseUrl, authHash } = getConfig();
 
-  const res = await fetch(
-    `${baseUrl}/processos-administrativos/${hash}/despachos?pagina=1`,
-    {
-      headers: { "X-Auth-Hash": authHash },
-    }
-  );
+    const res = await fetch(
+      `${baseUrl}/processos-administrativos/${hash}/despachos?pagina=1`,
+      {
+        headers: { "X-Auth-Hash": authHash },
+      }
+    );
 
-  if (!res.ok) return null;
+    if (!res.ok) return null;
 
-  const json: OnedocDetalheResponse = await res.json();
-  const processo = json.data?.[0] ?? null;
-  if (!processo) return null;
+    const json: OnedocDetalheResponse = await res.json();
+    const processo = json.data?.[0] ?? null;
+    if (!processo) return null;
 
-  return sanitizarProcesso(processo);
+    return sanitizarProcesso(processo);
+  } catch (err) {
+    console.error(`[1Doc] Falha ao buscar detalhe ${hash}:`, err);
+    return null;
+  }
 }
 
 // ─── Exportações com Cache (Escopo Global para Evitar Memory Leaks) ───────
 
-export const listarProcessos = unstable_cache(
-  async () => obterTodosProcessosInterno(),
-  ["processos-list"],
+export const buscarProcessosPaginado = unstable_cache(
+  async (pagina: number, ano?: string, mes?: string) => 
+    obterProcessosPaginadoInterno(pagina, ano, mes),
+  ["processos-paginados"],
   { revalidate: 300, tags: ["processos"] }
 );
 
 export const buscarDetalhe = unstable_cache(
   async (hash: string) => obterDetalheInterno(hash),
   ["processo-detalhe"],
+  { revalidate: 300 }
+);
+
+export const buscarHashPorNumero = unstable_cache(
+  async (numero: string, ano: string) => obterHashPorNumeroInterno(numero, ano),
+  ["processo-hash-numero"],
   { revalidate: 300 }
 );
