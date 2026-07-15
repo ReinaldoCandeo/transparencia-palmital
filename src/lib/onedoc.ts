@@ -48,6 +48,21 @@ interface OnedocProcesso {
   total_despachos?: string;
   movimentacoes?: OnedocMovimentacao[];
   anexos?: OnedocAnexo[];
+  // ── Campos do Formulário de Emenda Parlamentar (nomes obfuscados pela 1Doc) ──
+  // Mapeamento confirmado via diagnóstico em 2026-07-15
+  orgaopedido?: string;           // ORIGEM: '["Federal"]'
+  orgaopedido_1hmg1t1h?: string;  // Nº LEI / PORTARIA: "10.436"
+  divrequisitante?: string;       // FUNÇÃO LEGISLATIVA: '["Deputado"]'
+  paciente_1hpjan1h?: string;     // Nº EMENDA / DEMANDA
+  "4_1ha5rk1h"?: string;         // Nº PROPOSTA
+  rg_1hvcln1h?: string;           // TIPO: '["Custeio"]'
+  paciente_1hdyef1h?: string;     // BLOCO: '["302 - Média e Alta Complexidade"]'
+  responsave_1hl4nm1h?: string;   // VALOR DISPONIBILIZADO: "100000.00"
+  rg_1h5hxq1h?: string;           // EXERCÍCIO: "31/12/2026"
+  cpf_1hui711h?: string;          // DADOS BANCÁRIOS (nome do banco)
+  // 🚫 CAMPOS SENSÍVEIS — nunca incluir na saída pública (LGPD + Segurança)
+  agencia_1hh0po1h?: string;      // AGÊNCIA — BLOQUEADO
+  n_conta__1hmzl11h?: string;     // Nº CONTA — BLOQUEADO
 }
 
 interface OnedocPagina {
@@ -77,6 +92,22 @@ export interface AnexoPublico {
   tipo_mime: string;    // "application/pdf"
 }
 
+/** Dados públicos da emenda parlamentar (agência e nº conta OMITIDOS por segurança) */
+export interface EmendaInfo {
+  origem: string;              // "Federal" | "Estadual" | "Municipal"
+  lei_portaria: string;        // "10.436"
+  funcao_legislativa: string;  // "Deputado" | "Senador" | ...
+  num_emenda: string;          // "39380003"
+  num_proposta: string;        // "36000758410202600"
+  tipo: string;                // "Custeio" | "Investimento"
+  bloco: string;               // "302 - Média e Alta Complexidade"
+  valor_disponibilizado: string; // "R$ 100.000,00" (formatado)
+  valor_raw: string;           // "100000.00" (para cálculos)
+  exercicio: string;           // "31/12/2026"
+  banco: string;               // "CAIXA ECONOMICA FEDERAL"
+  justificativa: string;       // Texto limpo do campo conteudo (sem HTML, sem assinatura)
+}
+
 export interface ProcessoPublico {
   hash: string;
   num: string;
@@ -90,6 +121,7 @@ export interface ProcessoPublico {
   situacao_atual_str: string;
   movimentacoes: MovimentacaoPublica[];
   anexos: AnexoPublico[];
+  emenda?: EmendaInfo; // presente apenas em processos do assunto 1915747
 }
 
 // ─── Configuração ──────────────────────────────────────────────────────────
@@ -107,6 +139,104 @@ function getConfig(): { baseUrl: string; authHash: string } {
 
 // ─── Sanitização ──────────────────────────────────────────────────────────
 
+/**
+ * Extrai texto puro do HTML da 1Doc, removendo:
+ * - O bloco <div class="emissao_assinatura"> (contém nome de funcionário — LGPD)
+ * - Todas as demais tags HTML
+ */
+function stripHtml(html: string): string {
+  // Remove bloco de assinatura interna (LGPD: contém nome do servidor)
+  const semAssinatura = html.replace(
+    /<div[^>]*class=["'][^"']*emissao_assinatura[^"']*["'][^>]*>[\s\S]*?<\/div>/gi,
+    ""
+  );
+  // Substitui <br> por espaço, remove demais tags
+  return semAssinatura
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Deserializa campos select da 1Doc: '["Federal"]' → "Federal" */
+function parseSelect(valor: string | undefined): string {
+  if (!valor) return "";
+  try {
+    const arr = JSON.parse(valor);
+    if (Array.isArray(arr)) return arr.join(", ");
+  } catch {
+    // não é JSON — retorna o valor bruto
+  }
+  return valor;
+}
+
+/** Formata valor decimal da 1Doc para moeda BRL.
+ * A 1Doc salva campos 'decimal' no formato brasileiro: "100.000,00"
+ * (ponto = milhar, vírgula = decimal). parseFloat nativo não entende isso.
+ */
+function formatarMoeda(valor: string | undefined): string {
+  if (!valor) return "";
+  const str = String(valor).trim();
+  // Detecta formato brasileiro: "100.000,00" ou "1.000,00" ou "500,00"
+  const isBrazilian = /^\d{1,3}(\.\d{3})*,\d{2}$/.test(str);
+  let num: number;
+  if (isBrazilian) {
+    // Remove pontos de milhar e troca vírgula decimal por ponto
+    num = parseFloat(str.replace(/\./g, "").replace(",", "."));
+  } else {
+    // Assume formato inglês: "100000.00"
+    num = parseFloat(str);
+  }
+  if (isNaN(num)) return str;
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
+}
+
+/** Converte data ISO ("2026-12-31") para formato brasileiro ("31/12/2026").
+ * Se já estiver em DD/MM/AAAA, retorna como está.
+ */
+function formatarDataBR(valor: string | undefined): string {
+  if (!valor) return "";
+  // ISO: AAAA-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const [ano, mes, dia] = valor.split("-");
+    return `${dia}/${mes}/${ano}`;
+  }
+  return valor; // já em DD/MM/AAAA ou outro formato
+}
+
+/**
+ * Extrai e sanitiza os dados do Formulário de Emenda Parlamentar.
+ * Bloqueia explicitamente agência e nº de conta (dados bancários sensíveis).
+ */
+function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
+  // Só extrai se for um processo de emenda parlamentar
+  if (!p.orgaopedido && !p.paciente_1hpjan1h) return undefined;
+
+  const valorRaw = p.responsave_1hl4nm1h ?? "";
+
+  return {
+    origem: parseSelect(p.orgaopedido),
+    lei_portaria: p.orgaopedido_1hmg1t1h ?? "",
+    funcao_legislativa: parseSelect(p.divrequisitante),
+    num_emenda: p.paciente_1hpjan1h ?? "",
+    num_proposta: p["4_1ha5rk1h"] ?? "",
+    tipo: parseSelect(p.rg_1hvcln1h),
+    bloco: parseSelect(p.paciente_1hdyef1h),
+    valor_disponibilizado: formatarMoeda(valorRaw),
+    valor_raw: valorRaw,
+    exercicio: formatarDataBR(p.rg_1h5hxq1h),
+    banco: p.cpf_1hui711h ?? "",
+    // ✅ Justificativa: conteudo limpo de HTML e assinatura interna
+    justificativa: stripHtml(p.conteudo ?? ""),
+    // 🚫 agencia_1hh0po1h e n_conta__1hmzl11h: NUNCA incluídos aqui
+  };
+}
+
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
   return {
     hash: p.hash,
@@ -119,6 +249,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     origem_setor: p.origem_setor,
     destino_setor: p.destino_setor,
     situacao_atual_str: p.situacao_atual_str,
+    emenda: extrairEmenda(p),
     movimentacoes: (p.movimentacoes ?? [])
       .filter((m) => m.data && m.data !== "0000-00-00")
       .map((m) => ({
@@ -129,7 +260,6 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
         origem_setor: m.origem_setor ?? "",
       })),
     anexos: (p.anexos ?? []).map((a) => {
-      // Extração segura da extensão
       const partes = a.arquivo.split(".");
       const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
       return {
@@ -248,6 +378,19 @@ async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null
     const json: OnedocDetalheResponse = await res.json();
     const processo = json.data?.[0] ?? null;
     if (!processo) return null;
+
+    // ── FASE 1 - DIAGNÓSTICO: Inspeciona o campo `conteudo` bruto ──────────
+    // Remove este bloco após a inspeção confirmar a estrutura do formulário
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[DIAG] id_assunto:", processo.id_assunto);
+      console.log("[DIAG] conteudo (primeiros 2000 chars):", String(processo.conteudo ?? "").slice(0, 2000));
+      console.log("[DIAG] resumo:", processo.resumo ?? "(ausente)");
+      console.log("[DIAG] campos extras:", JSON.stringify({
+        total_despachos: processo.total_despachos,
+        num_formatado: processo.num_formatado,
+      }));
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     return sanitizarProcesso(processo);
   } catch (err) {
