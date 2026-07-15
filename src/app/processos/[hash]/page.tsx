@@ -8,18 +8,26 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldAlert,
+  Landmark,
+  Banknote,
+  Hash,
+  Gavel,
+  Tag,
+  LayoutGrid,
+  CalendarClock,
+  CreditCard,
+  ScrollText,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { buscarDetalhe } from "@/lib/onedoc";
+import type { EmendaInfo } from "@/lib/onedoc";
 import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 
 function formatDateBR(dataStr: string, horaStr?: string) {
   if (!dataStr) return "";
-  // A 1Doc retorna data no formato "DD/MM/YYYY" e hora como "HH:MM"
-  // Montamos um ISO aproximado para exibição formatada
   const [dia, mes, ano] =
     dataStr.includes("/") ? dataStr.split("/") : [null, null, null];
-  if (!dia || !mes || !ano) return dataStr; // fallback: exibe o valor bruto
+  if (!dia || !mes || !ano) return dataStr;
   const iso = `${ano}-${mes}-${dia}${horaStr ? "T" + horaStr : ""}`;
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
@@ -27,6 +35,114 @@ function formatDateBR(dataStr: string, horaStr?: string) {
     year: "numeric",
     ...(horaStr ? { hour: "2-digit", minute: "2-digit" } : {}),
   }).format(new Date(iso));
+}
+
+function InfoField({
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  if (!value) return null;
+  return (
+    <div className={className}>
+      <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </dt>
+      <dd className="mt-1.5 text-sm font-medium text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function EmendaBlock({ emenda }: { emenda: EmendaInfo }) {
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 shadow-sm dark:border-emerald-800/40 dark:bg-emerald-950/20 sm:p-8">
+      {/* Cabeçalho */}
+      <div className="flex items-center gap-3 border-b border-emerald-200/70 pb-4 dark:border-emerald-800/40">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+          <Landmark className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-emerald-900 dark:text-emerald-100">
+            Emenda Parlamentar — Informações Públicas
+          </h3>
+          <p className="text-xs text-emerald-700/80 dark:text-emerald-400">
+            Dados do Formulário de Controle Interno de Emendas — Saúde
+          </p>
+        </div>
+      </div>
+
+      {/* Destaque do Valor */}
+      {emenda.valor_disponibilizado && (
+        <div className="mt-5 flex flex-col items-center justify-center rounded-xl bg-emerald-600 py-5 text-white shadow-inner sm:flex-row sm:gap-4">
+          <Banknote className="h-7 w-7 opacity-80" />
+          <div className="text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-widest opacity-80">
+              Valor Disponibilizado
+            </p>
+            <p className="text-3xl font-bold tracking-tight">
+              {emenda.valor_disponibilizado}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Grid de campos */}
+      <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+        <InfoField icon={Building} label="Origem" value={emenda.origem} />
+        <InfoField icon={Gavel} label="Função Legislativa" value={emenda.funcao_legislativa} />
+        <InfoField icon={Hash} label="Nº da Emenda" value={emenda.num_emenda} />
+        <InfoField icon={ScrollText} label="Lei / Portaria" value={emenda.lei_portaria} />
+        <InfoField icon={Tag} label="Tipo" value={emenda.tipo} />
+        <InfoField icon={LayoutGrid} label="Bloco" value={emenda.bloco} />
+        <InfoField icon={CalendarClock} label="Exercício" value={emenda.exercicio} />
+        <InfoField
+          icon={CreditCard}
+          label="Banco Conveniado"
+          value={emenda.banco}
+          className="col-span-2 sm:col-span-2"
+        />
+        {emenda.num_proposta && (
+          <InfoField
+            icon={FileText}
+            label="Nº Proposta"
+            value={emenda.num_proposta}
+            className="col-span-2 sm:col-span-3"
+          />
+        )}
+      </dl>
+
+      {/* Aviso de dados bancários */}
+      <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-emerald-300/60 bg-emerald-100/60 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-700/40 dark:bg-emerald-900/30 dark:text-emerald-300">
+        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          <strong>Dados bancários protegidos:</strong> O número da agência e da
+          conta corrente são omitidos neste portal por proteção de
+          infraestrutura pública, em conformidade com as boas práticas de
+          segurança da informação e LGPD.
+        </span>
+      </div>
+
+      {/* Justificativa */}
+      {emenda.justificativa && (
+        <div className="mt-6">
+          <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+            <ScrollText className="h-4 w-4" />
+            Justificativa da Emenda
+          </h4>
+          <p className="rounded-lg border border-emerald-200/60 bg-white/70 px-4 py-3 text-sm leading-relaxed text-foreground dark:border-emerald-800/30 dark:bg-black/20">
+            {emenda.justificativa}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default async function DetalhesProcesso({
@@ -105,6 +221,9 @@ export default async function DetalhesProcesso({
                 </div>
               </div>
             </div>
+
+            {/* Bloco de Emenda Parlamentar */}
+            {processo.emenda && <EmendaBlock emenda={processo.emenda} />}
 
             {/* Documentos Anexados & Aviso LGPD */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
