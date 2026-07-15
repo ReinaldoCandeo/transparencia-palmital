@@ -175,12 +175,38 @@ function parseSelect(valor: string | undefined): string {
   return valor;
 }
 
-/** Formata valor decimal da 1Doc para moeda BRL */
+/** Formata valor decimal da 1Doc para moeda BRL.
+ * A 1Doc salva campos 'decimal' no formato brasileiro: "100.000,00"
+ * (ponto = milhar, vírgula = decimal). parseFloat nativo não entende isso.
+ */
 function formatarMoeda(valor: string | undefined): string {
   if (!valor) return "";
-  const num = parseFloat(String(valor).replace(",", "."));
-  if (isNaN(num)) return valor;
+  const str = String(valor).trim();
+  // Detecta formato brasileiro: "100.000,00" ou "1.000,00" ou "500,00"
+  const isBrazilian = /^\d{1,3}(\.\d{3})*,\d{2}$/.test(str);
+  let num: number;
+  if (isBrazilian) {
+    // Remove pontos de milhar e troca vírgula decimal por ponto
+    num = parseFloat(str.replace(/\./g, "").replace(",", "."));
+  } else {
+    // Assume formato inglês: "100000.00"
+    num = parseFloat(str);
+  }
+  if (isNaN(num)) return str;
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
+}
+
+/** Converte data ISO ("2026-12-31") para formato brasileiro ("31/12/2026").
+ * Se já estiver em DD/MM/AAAA, retorna como está.
+ */
+function formatarDataBR(valor: string | undefined): string {
+  if (!valor) return "";
+  // ISO: AAAA-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const [ano, mes, dia] = valor.split("-");
+    return `${dia}/${mes}/${ano}`;
+  }
+  return valor; // já em DD/MM/AAAA ou outro formato
 }
 
 /**
@@ -203,7 +229,7 @@ function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
     bloco: parseSelect(p.paciente_1hdyef1h),
     valor_disponibilizado: formatarMoeda(valorRaw),
     valor_raw: valorRaw,
-    exercicio: p.rg_1h5hxq1h ?? "",
+    exercicio: formatarDataBR(p.rg_1h5hxq1h),
     banco: p.cpf_1hui711h ?? "",
     // ✅ Justificativa: conteudo limpo de HTML e assinatura interna
     justificativa: stripHtml(p.conteudo ?? ""),
