@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   Search,
   ArrowRight,
   FileText,
   ShieldCheck,
-  Clock3,
   Building,
+  Target,
+  Clock3,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import type { ProcessoPublico } from "@/lib/onedoc";
@@ -29,8 +31,6 @@ const STATUS_COLORS: Record<string, string> = {
     "border-muted-foreground/20 bg-muted/50 text-muted-foreground",
 };
 
-// ─── StatusBadge (exportado — usado em processos/[hash]/page.tsx) ──────────
-
 export function StatusBadge({ status }: { status: string }) {
   const color =
     STATUS_COLORS[status] ??
@@ -45,65 +45,159 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Mapeamento de tipagem (Radar) ────────────────────────────────────────
+
+function mapearProcesso(raw: any): ProcessoPublico {
+  return {
+    hash: raw.hash ?? "",
+    num: String(raw.num ?? ""),
+    ano: String(raw.ano ?? ""),
+    num_formatado: raw.num_formatado ?? "",
+    assunto: raw.assunto ?? "",
+    data: raw.data ?? "",
+    hora: raw.hora ?? "",
+    origem_setor: raw.origem_setor ?? "",
+    destino_setor: raw.destino_setor ?? "",
+    situacao_atual_str: raw.situacao_atual_str ?? "",
+    movimentacoes: [],
+    anexos: [],
+  };
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────
 
 export default function BuscaProcessosClient({
-  initialProcessos,
+  processos,
+  paginaAtual,
+  totalPaginas,
 }: {
-  initialProcessos: ProcessoPublico[];
+  processos: ProcessoPublico[];
+  paginaAtual: number;
+  totalPaginas: number;
 }) {
-  const [q, setQ] = useState("");
-  const [statusFiltro, setStatusFiltro] = useState<string>("Todos");
-  const [processos, setProcessos] = useState<ProcessoPublico[]>(initialProcessos);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // ── Modo Radar ────────────────────────────────────────────────────────────
+  const ID_ALVO = 1915747;
+  const ITENS_META = 15;
+  const MAX_PAGINAS = 50;
+
+  const [radarAtivo, setRadarAtivo] = useState(true);
+  const [paginaRadar, setPaginaRadar] = useState(1);
+  const [processosRadar, setProcessosRadar] = useState<ProcessoPublico[]>([]);
 
   useEffect(() => {
-    setProcessos(initialProcessos);
-    setIsLoading(false);
-  }, [initialProcessos]);
+    let cancelado = false;
+  
+    (async () => {
+      const coletados: ProcessoPublico[] = [];
+  
+      for (let pag = 1; pag <= MAX_PAGINAS; pag++) {
+        if (cancelado) return;
+        setPaginaRadar(pag);
+  
+        const res = await fetch(`/api/processos/bruto?pagina=${pag}`);
+        if (!res.ok) {
+          const erroDetalhe = await res.text();
+          console.error(`[Radar] Bloqueio na página ${pag}:`, res.status, erroDetalhe);
+          break;
+        }
+  
+        const json = await res.json();
+        const emissoes: any[] = json?.data?.[0]?.emissoes ?? [];
+  
+        if (emissoes.length === 0) break; // API sem mais dados
+  
+        const matches = emissoes
+          .filter((e: any) => e.id_assunto === ID_ALVO)
+          .map(mapearProcesso);
+  
+        if (matches.length > 0) {
+          coletados.push(...matches);
+          // Atualiza a tabela na mesma hora
+          setProcessosRadar([...coletados]);
+        }
+  
+        if (coletados.length >= ITENS_META) break;
 
-  // Reset para a primeira página quando o filtro ou busca mudam
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [q, statusFiltro]);
+        // Respiro Anti-DDoS obrigatorio para proteger a infraestrutura e evitar o Rate Limit
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+  
+      if (!cancelado) {
+        setProcessosRadar(coletados.slice(0, ITENS_META));
+        setRadarAtivo(false);
+      }
+    })();
+  
+    return () => { cancelado = true; };
+  }, []);
 
-  // Lista de situações únicas para o filtro — derivada dos dados reais
-  const statusDisponiveis = useMemo(() => {
-    const unique = [...new Set(processos.map((p) => p.situacao_atual_str))];
-    return unique.sort();
-  }, [processos]);
+  const [buscaDiretaNum, setBuscaDiretaNum] = useState("");
+  const [buscaDiretaAno, setBuscaDiretaAno] = useState(
+    new Date().getFullYear().toString()
+  );
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
-  const results = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    return processos.filter((p) => {
-      if (statusFiltro !== "Todos" && p.situacao_atual_str !== statusFiltro)
-        return false;
-      if (!query) return true;
-      return (
-        p.num?.toString().includes(query) ||
-        p.ano?.toString().includes(query) ||
-        p.num_formatado?.toLowerCase().includes(query) ||
-        p.assunto?.toLowerCase().includes(query) ||
-        p.destino_setor?.toLowerCase().includes(query) ||
-        p.origem_setor?.toLowerCase().includes(query)
+  const anosDisponiveis = Array.from({ length: 10 }, (_, i) =>
+    (new Date().getFullYear() - i).toString()
+  );
+  const meses = [
+    { value: "", label: "Todos os meses" },
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Março" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+  ];
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("pagina", newPage.toString());
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
+  const handleBuscaDireta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchError("");
+    if (!buscaDiretaNum || !buscaDiretaAno) return;
+
+    setIsSearching(true);
+    try {
+      const res = await fetch(
+        `/api/processos/busca-direta?numero=${buscaDiretaNum}&ano=${buscaDiretaAno}`
       );
-    });
-  }, [q, statusFiltro, processos]);
-
-  const totalPages = Math.ceil(results.length / itemsPerPage);
-
-  const paginatedResults = useMemo(() => {
-    return results.slice(
-      (currentPage - 1) * itemsPerPage,
-      currentPage * itemsPerPage
-    );
-  }, [results, currentPage]);
+      if (!res.ok) {
+        setSearchError("Processo não encontrado no ano informado.");
+        setIsSearching(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.hash) {
+        router.push(`/processos/${data.hash}`);
+      } else {
+        setSearchError("Processo não localizado na base de dados.");
+        setIsSearching(false);
+      }
+    } catch (err) {
+      setSearchError("Erro ao consultar o processo. Tente novamente.");
+      setIsSearching(false);
+    }
+  };
 
   return (
     <PortalLayout>
-      {/* Hero de busca */}
+      {/* Hero de Busca Exata (Client Action) */}
       <section className="relative overflow-hidden border-b border-border bg-gradient-to-br from-primary via-primary to-primary/85 text-primary-foreground">
         <div
           aria-hidden
@@ -125,57 +219,84 @@ export default function BuscaProcessosClient({
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-primary-foreground/85 sm:text-base">
               Acompanhe a tramitação completa dos processos da Prefeitura
-              Municipal com rastro auditável, em conformidade com a Nova Lei de
-              Licitações e a Lei de Acesso à Informação.
+              Municipal com rastro auditável.
             </p>
 
-            <div className="mt-8">
-              <label className="sr-only" htmlFor="q">
-                Pesquisar processo
+            <form onSubmit={handleBuscaDireta} className="mt-8">
+              <label className="text-sm font-semibold mb-2 block text-primary-foreground/90">
+                <Target className="inline-block w-4 h-4 mr-1 mb-0.5" />
+                Busca Exata por Número e Ano
               </label>
-              <div className="flex items-center gap-2 rounded-xl bg-background p-2 text-foreground shadow-lg ring-1 ring-black/5">
-                <div className="flex flex-1 items-center gap-2 pl-2">
-                  <Search className="h-5 w-5 text-muted-foreground" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl bg-background/10 p-2 text-foreground shadow-lg ring-1 ring-black/5 backdrop-blur-md">
+                
+                <div className="flex w-full sm:w-auto flex-1 items-center gap-2 pl-2 bg-background rounded-lg">
+                  <Search className="h-5 w-5 text-muted-foreground ml-2" />
                   <input
-                    id="q"
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    placeholder='Buscar por Número, Ano ou Assunto (ex: "342/2025" ou "Licitação")'
-                    className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground sm:text-base"
+                    type="number"
+                    required
+                    value={buscaDiretaNum}
+                    onChange={(e) => setBuscaDiretaNum(e.target.value)}
+                    placeholder='Número (ex: 2504)'
+                    className="w-full bg-transparent py-2.5 px-2 text-sm outline-none placeholder:text-muted-foreground sm:text-base"
                   />
                 </div>
-                <button className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:inline-flex">
-                  Pesquisar
+
+                <div className="flex w-full sm:w-32 shrink-0 items-center gap-2 bg-background rounded-lg">
+                  <select
+                    value={buscaDiretaAno}
+                    onChange={(e) => setBuscaDiretaAno(e.target.value)}
+                    className="w-full bg-transparent py-2.5 px-3 text-sm outline-none text-foreground"
+                  >
+                    {anosDisponiveis.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="w-full sm:w-auto shrink-0 items-center justify-center gap-1.5 rounded-lg bg-background text-primary px-6 py-2.5 text-sm font-bold shadow-sm hover:bg-background/90 disabled:opacity-50 inline-flex transition-colors"
+                >
+                  {isSearching ? "Buscando..." : "Buscar Direto"}
                 </button>
               </div>
-            </div>
+              {searchError && (
+                <p className="mt-2 text-sm font-medium text-red-200 bg-red-900/40 px-3 py-1.5 rounded-md inline-block backdrop-blur border border-red-500/30">
+                  {searchError}
+                </p>
+              )}
+            </form>
           </div>
         </div>
       </section>
 
-      {/* Filtros + tabela */}
+      {/* Listagem Exploratória (SSR Paginada) */}
       <section className="mx-auto max-w-7xl px-4 py-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mt-12 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <h3 className="text-xl font-semibold text-foreground">
-              Resultados da consulta
+            <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Listagem Geral (Últimos Processos)
             </h3>
-            <p className="text-sm text-muted-foreground">
-              {isLoading
-                ? "Carregando..."
-                : `${results.length} processo(s) encontrado(s)`}
+            <p className="mt-1 text-sm text-muted-foreground">
+              Página {paginaAtual} de {totalPaginas}
             </p>
           </div>
-
-          <div className="flex flex-col gap-4 md:flex-row">
-            <FiltroSelecao
-              label="Situação"
-              value={statusFiltro}
-              onChange={setStatusFiltro}
-              options={["Todos", ...statusDisponiveis]}
-            />
-          </div>
         </div>
+
+        {radarAtivo && (
+          <div className="mt-6 flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+            </span>
+            Varrendo processos...{" "}
+            <span className="font-mono font-semibold text-muted-foreground ml-auto">
+              (Página {paginaRadar}/50 — {processosRadar.length}/15 encontrados)
+            </span>
+          </div>
+        )}
 
         {/* Tabela (desktop) */}
         <div className="mt-6 hidden overflow-hidden rounded-xl border border-border bg-card md:block">
@@ -191,7 +312,7 @@ export default function BuscaProcessosClient({
               </tr>
             </thead>
             <tbody>
-              {paginatedResults.map((p) => (
+              {processosRadar.map((p) => (
                 <tr
                   key={p.hash}
                   className="group border-t border-border transition-colors hover:bg-muted/40"
@@ -229,13 +350,13 @@ export default function BuscaProcessosClient({
                   </td>
                 </tr>
               ))}
-              {!isLoading && results.length === 0 && (
+              {processosRadar.length === 0 && !radarAtivo && (
                 <tr>
                   <td
                     colSpan={6}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
-                    Nenhum processo encontrado para os filtros informados.
+                    Nenhum processo de Saúde encontrado.
                   </td>
                 </tr>
               )}
@@ -245,7 +366,7 @@ export default function BuscaProcessosClient({
 
         {/* Cards (mobile) */}
         <ul className="mt-6 grid gap-4 md:hidden list-none p-0 m-0">
-          {paginatedResults.map((p) => (
+          {processosRadar.map((p) => (
             <li
               key={p.hash}
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
@@ -286,119 +407,14 @@ export default function BuscaProcessosClient({
               </Link>
             </li>
           ))}
+          {processosRadar.length === 0 && !radarAtivo && (
+            <li className="p-8 text-center text-sm text-muted-foreground border border-border rounded-xl">
+               Nenhum processo de Saúde encontrado.
+            </li>
+          )}
         </ul>
 
-        {/* Paginação */}
-        {totalPages > 1 && (
-          <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-6 sm:flex-row">
-            <p className="text-sm text-muted-foreground">
-              Exibindo de{" "}
-              <span className="font-semibold text-foreground">
-                {Math.min((currentPage - 1) * itemsPerPage + 1, results.length)}
-              </span>{" "}
-              a{" "}
-              <span className="font-semibold text-foreground">
-                {Math.min(currentPage * itemsPerPage, results.length)}
-              </span>{" "}
-              de{" "}
-              <span className="font-semibold text-foreground">
-                {results.length}
-              </span>{" "}
-              processos
-            </p>
-
-            <nav className="inline-flex items-center -space-x-px rounded-lg bg-card shadow-sm">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((c) => Math.max(c - 1, 1))}
-                className="rounded-l-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-muted-foreground"
-              >
-                Anterior
-              </button>
-              {[...Array(totalPages)].map((_, i) => {
-                const pageNumber = i + 1;
-                // Exibe no máximo 5 botões de página (com elipse para UX limpa)
-                if (
-                  totalPages > 7 &&
-                  pageNumber !== 1 &&
-                  pageNumber !== totalPages &&
-                  Math.abs(pageNumber - currentPage) > 1
-                ) {
-                  if (
-                    pageNumber === 2 &&
-                    currentPage > 3
-                  ) {
-                    return (
-                      <span
-                        key="ellipsis-start"
-                        className="border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
-                      >
-                        ...
-                      </span>
-                    );
-                  }
-                  if (
-                    pageNumber === totalPages - 1 &&
-                    currentPage < totalPages - 2
-                  ) {
-                    return (
-                      <span
-                        key="ellipsis-end"
-                        className="border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
-                      >
-                        ...
-                      </span>
-                    );
-                  }
-                  return null;
-                }
-
-                return (
-                  <button
-                    key={pageNumber}
-                    onClick={() => setCurrentPage(pageNumber)}
-                    aria-current={currentPage === pageNumber ? "page" : undefined}
-                    className={`border border-border px-3.5 py-2 text-sm font-medium transition-colors ${
-                      currentPage === pageNumber
-                        ? "z-10 bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    {pageNumber}
-                  </button>
-                );
-              })}
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((c) => Math.min(c + 1, totalPages))}
-                className="rounded-r-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-muted-foreground"
-              >
-                Próximo
-              </button>
-            </nav>
-          </div>
-        )}
-
-        {/* Indicadores institucionais */}
-        <div className="mt-12 grid gap-4 sm:grid-cols-3">
-          <CartaoIndicador
-            icon={<FileText className="h-5 w-5" />}
-            label="Autuações Publicadas"
-            value={processos.length.toString()}
-          />
-          <CartaoIndicador
-            icon={<Clock3 className="h-5 w-5" />}
-            label="Em Tramitação"
-            value={processos
-              .filter((p) => p.situacao_atual_str === "Em Tramitação")
-              .length.toString()}
-          />
-          <CartaoIndicador
-            icon={<Building className="h-5 w-5" />}
-            label="Setor Responsável"
-            value="Terceiro Setor"
-          />
-        </div>
+        {/* Paginação Desabilitada na PoC */}
       </section>
     </PortalLayout>
   );
@@ -415,46 +431,22 @@ function FiltroSelecao({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: readonly string[];
+  options: { value: string; label: string }[];
 }) {
   return (
-    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 w-full md:w-64">
+    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 w-full sm:w-48">
       {label}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 block w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+        className="mt-1 block w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 cursor-pointer"
       >
         {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
+          <option key={o.value} value={o.value}>
+            {o.label}
           </option>
         ))}
       </select>
     </label>
-  );
-}
-
-function CartaoIndicador({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </div>
-    </div>
   );
 }
