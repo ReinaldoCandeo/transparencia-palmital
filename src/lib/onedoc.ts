@@ -44,6 +44,7 @@ interface OnedocProcesso {
   destino_setor: string;
   situacao_atual_str: string;
   hash: string;
+  id_assunto: number;    // presente na listagem — usado para filtragem pós-fetch
   total_despachos?: string;
   movimentacoes?: OnedocMovimentacao[];
   anexos?: OnedocAnexo[];
@@ -175,9 +176,13 @@ async function obterProcessosPaginadoInterno(
       return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
     }
 
-    const processos = paginaDados.emissoes.map(sanitizarProcesso);
-    // Assumindo 15 itens por página conforme padrão anterior da 1Doc
-    const totalPaginas = Math.ceil((paginaDados.total || 0) / 15) || 1;
+    const processos = paginaDados.emissoes
+      // PoC: filtra apenas processos do assunto 1915747 (Controle Interno de Emendas - SAÚDE)
+      // TODO: tornar dinâmico após validação
+      .filter((p) => p.id_assunto === 1915747)
+      .map(sanitizarProcesso);
+    // A API retorna 20 itens por página (corrigido de 15)
+    const totalPaginas = Math.ceil((paginaDados.total || 0) / 20) || 1;
 
     return { processos, paginaAtual: pagina, totalPaginas };
   } catch (err) {

@@ -1,4 +1,4 @@
-import { buscarProcessosPaginado, type ProcessoPublico } from "@/lib/onedoc";
+import type { ProcessoPublico } from "@/lib/onedoc";
 import BuscaProcessosClient from "@/components/portal/BuscaProcessosClient";
 
 export const dynamic = "force-dynamic";
@@ -10,21 +10,13 @@ export default async function PaginaBuscaProcessos({
 }) {
   const params = await searchParams;
   
-  // Extrai filtros da URL
+  // Extrai filtros da URL (desabilitado na PoC)
   const pagina = params.pagina ? parseInt(params.pagina as string, 10) : 1;
 
-  let processos: ProcessoPublico[] = [];
-  let paginaAtual = 1;
-  let totalPaginas = 1;
-
-  try {
-    const resultado = await buscarProcessosPaginado(pagina);
-    processos = resultado.processos;
-    paginaAtual = resultado.paginaAtual;
-    totalPaginas = resultado.totalPaginas;
-  } catch (err) {
-    console.error("[PaginaBusca] Falha ao carregar processos:", err);
-  }
+  // Server Component não carrega mais processos — o Modo Radar no client faz isso
+  const processos: ProcessoPublico[] = [];
+  const paginaAtual = 1;
+  const totalPaginas = 1;
 
   return (
     <BuscaProcessosClient 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   ArrowRight,
@@ -45,6 +45,25 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ─── Mapeamento de tipagem (Radar) ────────────────────────────────────────
+
+function mapearProcesso(raw: any): ProcessoPublico {
+  return {
+    hash: raw.hash ?? "",
+    num: String(raw.num ?? ""),
+    ano: String(raw.ano ?? ""),
+    num_formatado: raw.num_formatado ?? "",
+    assunto: raw.assunto ?? "",
+    data: raw.data ?? "",
+    hora: raw.hora ?? "",
+    origem_setor: raw.origem_setor ?? "",
+    destino_setor: raw.destino_setor ?? "",
+    situacao_atual_str: raw.situacao_atual_str ?? "",
+    movimentacoes: [],
+    anexos: [],
+  };
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────
 
 export default function BuscaProcessosClient({
@@ -59,6 +78,55 @@ export default function BuscaProcessosClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // ── Modo Radar ────────────────────────────────────────────────────────────
+  const ID_ALVO = 1915747;
+  const ITENS_META = 15;
+  const MAX_PAGINAS = 50;
+
+  const [radarAtivo, setRadarAtivo] = useState(true);
+  const [paginaRadar, setPaginaRadar] = useState(1);
+  const [processosRadar, setProcessosRadar] = useState<ProcessoPublico[]>([]);
+
+  useEffect(() => {
+    let cancelado = false;
+  
+    (async () => {
+      const coletados: ProcessoPublico[] = [];
+  
+      for (let pag = 1; pag <= MAX_PAGINAS; pag++) {
+        if (cancelado) return;
+        setPaginaRadar(pag);
+  
+        const res = await fetch(`/api/processos/bruto?pagina=${pag}`);
+        if (!res.ok) break;
+  
+        const json = await res.json();
+        const emissoes: any[] = json?.data?.[0]?.emissoes ?? [];
+  
+        if (emissoes.length === 0) break; // API sem mais dados
+  
+        const matches = emissoes
+          .filter((e: any) => e.id_assunto === ID_ALVO)
+          .map(mapearProcesso);
+  
+        if (matches.length > 0) {
+          coletados.push(...matches);
+          // Atualiza a tabela na mesma hora
+          setProcessosRadar([...coletados]);
+        }
+  
+        if (coletados.length >= ITENS_META) break;
+      }
+  
+      if (!cancelado) {
+        setProcessosRadar(coletados.slice(0, ITENS_META));
+        setRadarAtivo(false);
+      }
+    })();
+  
+    return () => { cancelado = true; };
+  }, []);
 
   const [buscaDiretaNum, setBuscaDiretaNum] = useState("");
   const [buscaDiretaAno, setBuscaDiretaAno] = useState(
@@ -210,6 +278,19 @@ export default function BuscaProcessosClient({
           </div>
         </div>
 
+        {radarAtivo && (
+          <div className="mt-6 flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+            </span>
+            Varrendo processos...{" "}
+            <span className="font-mono font-semibold text-muted-foreground ml-auto">
+              (Página {paginaRadar}/50 — {processosRadar.length}/15 encontrados)
+            </span>
+          </div>
+        )}
+
         {/* Tabela (desktop) */}
         <div className="mt-6 hidden overflow-hidden rounded-xl border border-border bg-card md:block">
           <table className="w-full text-left text-sm">
@@ -224,7 +305,7 @@ export default function BuscaProcessosClient({
               </tr>
             </thead>
             <tbody>
-              {processos.map((p) => (
+              {processosRadar.map((p) => (
                 <tr
                   key={p.hash}
                   className="group border-t border-border transition-colors hover:bg-muted/40"
@@ -262,13 +343,13 @@ export default function BuscaProcessosClient({
                   </td>
                 </tr>
               ))}
-              {processos.length === 0 && (
+              {processosRadar.length === 0 && !radarAtivo && (
                 <tr>
                   <td
                     colSpan={6}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
-                    Nenhum processo encontrado na página solicitada para este período.
+                    Nenhum processo de Saúde encontrado.
                   </td>
                 </tr>
               )}
@@ -278,7 +359,7 @@ export default function BuscaProcessosClient({
 
         {/* Cards (mobile) */}
         <ul className="mt-6 grid gap-4 md:hidden list-none p-0 m-0">
-          {processos.map((p) => (
+          {processosRadar.map((p) => (
             <li
               key={p.hash}
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
@@ -319,39 +400,14 @@ export default function BuscaProcessosClient({
               </Link>
             </li>
           ))}
-          {processos.length === 0 && (
+          {processosRadar.length === 0 && !radarAtivo && (
             <li className="p-8 text-center text-sm text-muted-foreground border border-border rounded-xl">
-               Nenhum processo encontrado.
+               Nenhum processo de Saúde encontrado.
             </li>
           )}
         </ul>
 
-        {/* Paginação Server-Side via URL */}
-        {totalPaginas > 1 && (
-          <div className="mt-8 flex flex-col items-center justify-center border-t border-border pt-6">
-            <nav className="inline-flex items-center -space-x-px rounded-lg shadow-sm">
-              <button
-                disabled={paginaAtual <= 1}
-                onClick={() => handlePageChange(paginaAtual - 1)}
-                className="rounded-l-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted hover:text-primary disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-foreground transition-colors"
-              >
-                Anterior
-              </button>
-              
-              <div className="border-y border-border bg-card px-4 py-2.5 text-sm font-medium text-muted-foreground">
-                 Página {paginaAtual} de {totalPaginas}
-              </div>
-
-              <button
-                disabled={paginaAtual >= totalPaginas}
-                onClick={() => handlePageChange(paginaAtual + 1)}
-                className="rounded-r-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted hover:text-primary disabled:opacity-50 disabled:hover:bg-card disabled:hover:text-foreground transition-colors"
-              >
-                Próxima
-              </button>
-            </nav>
-          </div>
-        )}
+        {/* Paginação Desabilitada na PoC */}
       </section>
     </PortalLayout>
   );
