@@ -99,7 +99,11 @@ export default function BuscaProcessosClient({
         setPaginaRadar(pag);
   
         const res = await fetch(`/api/processos/bruto?pagina=${pag}`);
-        if (!res.ok) break;
+        if (!res.ok) {
+          const erroDetalhe = await res.text();
+          console.error(`[Radar] Bloqueio na página ${pag}:`, res.status, erroDetalhe);
+          break;
+        }
   
         const json = await res.json();
         const emissoes: any[] = json?.data?.[0]?.emissoes ?? [];
@@ -117,6 +121,9 @@ export default function BuscaProcessosClient({
         }
   
         if (coletados.length >= ITENS_META) break;
+
+        // Respiro Anti-DDoS obrigatorio para proteger a infraestrutura e evitar o Rate Limit
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
   
       if (!cancelado) {
