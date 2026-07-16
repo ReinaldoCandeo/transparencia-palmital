@@ -303,10 +303,14 @@ async function obterProcessosPaginadoInterno(
       return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
     }
 
+    const ASSUNTOS_EMENDA = new Set([
+      1915747, // MAC - Emenda Federal - Saúde
+      1915739, // Terceiro Setor - Emenda Municipais - Social
+      1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - Social
+    ]);
+
     const processos = paginaDados.emissoes
-      // PoC: filtra apenas processos do assunto 1915747 (Controle Interno de Emendas - SAÚDE)
-      // TODO: tornar dinâmico após validação
-      .filter((p) => p.id_assunto === 1915747)
+      .filter((p) => ASSUNTOS_EMENDA.has(p.id_assunto))
       .map(sanitizarProcesso);
     // A API retorna 20 itens por página (corrigido de 15)
     const totalPaginas = Math.ceil((paginaDados.total || 0) / 20) || 1;
