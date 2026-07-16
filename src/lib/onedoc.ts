@@ -1,7 +1,4 @@
 import { unstable_cache } from "next/cache";
-import { SETORES_PERMITIDOS } from "@/config/setores";
-import fs from "fs";
-import path from "path";
 
 // ─── Interfaces do payload bruto da 1Doc ──────────────────────────────────
 
@@ -379,17 +376,8 @@ async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null
     const processo = json.data?.[0] ?? null;
     if (!processo) return null;
 
-    // ── FASE 1 - DIAGNÓSTICO: Inspeciona o campo `conteudo` bruto ──────────
-    // Remove este bloco após a inspeção confirmar a estrutura do formulário
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[DIAG] id_assunto:", processo.id_assunto);
-      console.log("[DIAG] conteudo (primeiros 2000 chars):", String(processo.conteudo ?? "").slice(0, 2000));
-      console.log("[DIAG] resumo:", processo.resumo ?? "(ausente)");
-      console.log("[DIAG] campos extras:", JSON.stringify({
-        total_despachos: processo.total_despachos,
-        num_formatado: processo.num_formatado,
-      }));
-    }
+    // ── FASE 1 - MAPEAMENTO: Inspeciona o campo `conteudo` bruto ──────────
+    // Logs de diagnóstico removidos (LGPD / Segurança)
     // ────────────────────────────────────────────────────────────────────────
 
     return sanitizarProcesso(processo);
