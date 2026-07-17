@@ -53,6 +53,7 @@ function mapearProcesso(raw: any): ProcessoPublico {
     num: String(raw.num ?? ""),
     ano: String(raw.ano ?? ""),
     num_formatado: raw.num_formatado ?? "",
+    id_assunto: raw.id_assunto ?? 0,
     assunto: raw.assunto ?? "",
     data: raw.data ?? "",
     hora: raw.hora ?? "",
@@ -80,7 +81,8 @@ export default function BuscaProcessosClient({
   const searchParams = useSearchParams();
 
   // ── Modo Radar ────────────────────────────────────────────────────────────
-  const ID_ALVO = 1915747;
+  // IDs dos assuntos de emenda monitorados (espelha o filtro em onedoc.ts)
+  const IDS_ALVO = new Set([1915747, 1915739, 1915740]);
   const ITENS_META = 15;
   const MAX_PAGINAS = 50;
 
@@ -111,12 +113,11 @@ export default function BuscaProcessosClient({
         if (emissoes.length === 0) break; // API sem mais dados
   
         const matches = emissoes
-          .filter((e: any) => e.id_assunto === ID_ALVO)
+          .filter((e: any) => IDS_ALVO.has(e.id_assunto))
           .map(mapearProcesso);
   
         if (matches.length > 0) {
           coletados.push(...matches);
-          // Atualiza a tabela na mesma hora
           setProcessosRadar([...coletados]);
         }
   
@@ -356,7 +357,7 @@ export default function BuscaProcessosClient({
                     colSpan={6}
                     className="px-4 py-10 text-center text-muted-foreground"
                   >
-                    Nenhum processo de Saúde encontrado.
+                    Nenhum processo encontrado.
                   </td>
                 </tr>
               )}
@@ -409,7 +410,7 @@ export default function BuscaProcessosClient({
           ))}
           {processosRadar.length === 0 && !radarAtivo && (
             <li className="p-8 text-center text-sm text-muted-foreground border border-border rounded-xl">
-               Nenhum processo de Saúde encontrado.
+               Nenhum processo encontrado.
             </li>
           )}
         </ul>

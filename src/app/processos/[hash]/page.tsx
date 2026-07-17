@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { buscarDetalhe } from "@/lib/onedoc";
-import type { EmendaInfo } from "@/lib/onedoc";
+import type { EmendaInfo, EmendaSocialInfo } from "@/lib/onedoc";
 import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 
 function formatDateBR(dataStr: string, horaStr?: string) {
@@ -145,6 +145,79 @@ function EmendaBlock({ emenda }: { emenda: EmendaInfo }) {
   );
 }
 
+function EmendaSocialBlock({ emenda }: { emenda: EmendaSocialInfo }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+          <Landmark className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
+            Terceiro Setor Social
+          </h2>
+          <p className="text-sm font-medium text-blue-700/80 dark:text-blue-300/80">
+            {emenda.modalidade} • Lei/Portaria {emenda.num_emenda}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 md:grid-cols-3">
+        <div>
+          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
+            <Tag className="h-3.5 w-3.5" /> Entidade Beneficiária
+          </dt>
+          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
+            {emenda.razao_social}
+            <div className="text-xs mt-0.5 text-blue-700/60 dark:text-blue-300/60">
+              CNPJ: {emenda.cnpj_beneficiaria}
+            </div>
+          </dd>
+        </div>
+
+        <div>
+          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
+            <Building className="h-3.5 w-3.5" /> Órgão Concessor
+          </dt>
+          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
+            Prefeitura Municipal de Palmital
+            <div className="text-xs mt-0.5 text-blue-700/60 dark:text-blue-300/60">
+              CNPJ: {emenda.cnpj_concessor}
+            </div>
+          </dd>
+        </div>
+
+        <div>
+          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
+            <Banknote className="h-3.5 w-3.5" /> Valor do Repasse
+          </dt>
+          <dd className="mt-1.5 text-base font-bold text-blue-900 dark:text-blue-100">
+            {emenda.valor}
+          </dd>
+        </div>
+
+        <div>
+          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
+            <Gavel className="h-3.5 w-3.5" /> Vereador Autor
+          </dt>
+          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
+            {emenda.vereador_autor}
+          </dd>
+        </div>
+
+        <div className="sm:col-span-2">
+          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
+            <ScrollText className="h-3.5 w-3.5" /> Objeto da Parceria
+          </dt>
+          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
+            {emenda.objeto}
+          </dd>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function DetalhesProcesso({
   params,
 }: {
@@ -224,6 +297,7 @@ export default async function DetalhesProcesso({
 
             {/* Bloco de Emenda Parlamentar */}
             {processo.emenda && <EmendaBlock emenda={processo.emenda} />}
+            {processo.emenda_social && <EmendaSocialBlock emenda={processo.emenda_social} />}
 
             {/* Documentos Anexados & Aviso LGPD */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
@@ -232,10 +306,9 @@ export default async function DetalhesProcesso({
                 <div className="text-sm">
                   <p className="font-semibold">Aviso de Privacidade — LGPD</p>
                   <p className="mt-1 opacity-90">
-                    Em conformidade com a Lei Geral de Proteção de Dados (Lei nº
-                    13.709/2018), os arquivos originais estão restritos a
-                    acessos autenticados. Este portal exibe apenas os metadados
-                    dos documentos comprobatórios.
+                    {processo.emenda_social 
+                      ? "Os documentos comprobatórios das parcerias e convênios estão sendo processados e serão disponibilizados nesta seção em breve, em cumprimento à LAI e ao MROSC."
+                      : "Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), os arquivos originais estão restritos a acessos autenticados. Este portal exibe apenas os metadados dos documentos comprobatórios."}
                   </p>
                 </div>
               </div>
