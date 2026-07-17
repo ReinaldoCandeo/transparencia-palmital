@@ -105,11 +105,25 @@ export interface EmendaInfo {
   justificativa: string;       // Texto limpo do campo conteudo (sem HTML, sem assinatura)
 }
 
+export interface EmendaSocialInfo {
+  num_emenda:        string;  // orgaopedido_1hmg1t1h → "14/2025"
+  ano:               string;  // orgaopedido           → "2025"
+  vereador_autor:    string;  // paciente_1hpjan1h     → "Homero Marques Filho"
+  objeto:            string;  // divrequisitante        → "Repasse de recursos p/ TEA..."
+  origem:            string;  // 4_1ha5rk1h            → "Municipal"
+  modalidade:        string;  // rg_1hvcln1h           → "Emenda Individual Impositiva"
+  valor:             string;  // paciente_1hdyef1h      → formatarMoeda("35.000,00")
+  cnpj_concessor:    string;  // cpf_1hui711h           → "44.543.981/0001-99"
+  cnpj_beneficiaria: string;  // rg_1h5hxq1h           → "49.893.795/0001-01"
+  razao_social:      string;  // responsave_1hl4nm1h   → "ASSOC DE PAIS E AMIGOS..."
+}
+
 export interface ProcessoPublico {
   hash: string;
   num: string;
   ano: string;
   num_formatado: string;
+  id_assunto: number;
   assunto: string;
   data: string;
   hora: string;
@@ -118,7 +132,8 @@ export interface ProcessoPublico {
   situacao_atual_str: string;
   movimentacoes: MovimentacaoPublica[];
   anexos: AnexoPublico[];
-  emenda?: EmendaInfo; // presente apenas em processos do assunto 1915747
+  emenda?: EmendaInfo;          // Saúde (1915747) — mantida intacta
+  emenda_social?: EmendaSocialInfo; // Social (1915739, 1915740)
 }
 
 // ─── Configuração ──────────────────────────────────────────────────────────
@@ -234,19 +249,64 @@ function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
   };
 }
 
+const ASSUNTOS_SOCIAL = new Set([1915739, 1915740]);
+
+function isSocial(p: OnedocProcesso): boolean {
+  // 1. Tenta por ID ou texto do assunto se estiverem perfeitamente classificados
+  if (p.id_assunto && ASSUNTOS_SOCIAL.has(Number(p.id_assunto))) return true;
+  if (p.assunto && p.assunto.toLowerCase().includes("terceiro setor")) return true;
+
+  // 2. Heurística de Conteúdo (Solução Arquitetural Padrão para API /despachos)
+  // O campo 'rg_1h5hxq1h' armazena o "Exercício" (Saúde, ~4 dígitos) ou "CNPJ Beneficiária" (Social)
+  const rgValue = stripHtml(p.rg_1h5hxq1h ?? "").trim();
+  if (rgValue.length > 10 && rgValue.includes("/")) {
+    return true; // Contém barra e tem tamanho compatível com CNPJ
+  }
+
+  // O campo 'cpf_1hui711h' armazena "Banco" (Saúde, Texto) ou "CNPJ Concessor" (Social)
+  const cpfValue = stripHtml(p.cpf_1hui711h ?? "").trim();
+  if (cpfValue.length > 10 && /^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$/.test(cpfValue)) {
+    return true; // Match exato com regex de CNPJ formatado
+  }
+
+  return false;
+}
+
+function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
+  if (!isSocial(p)) return undefined;
+  if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
+
+  return {
+    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
+    ano:               stripHtml(p.orgaopedido ?? ""),
+    vereador_autor:    stripHtml(p.paciente_1hpjan1h ?? ""),
+    objeto:            stripHtml(p.divrequisitante ?? ""),
+    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""),  // campo com nome em dígito
+    modalidade:        stripHtml(p.rg_1hvcln1h ?? ""),
+    valor:             formatarMoeda(p.paciente_1hdyef1h),
+    cnpj_concessor:    stripHtml(p.cpf_1hui711h ?? ""),
+    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
+    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
+  };
+}
+
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
+  const processoSocial = isSocial(p);
+
   return {
     hash: p.hash,
     num: String(p.num),
     ano: String(p.ano),
     num_formatado: p.num_formatado,
-    assunto: p.assunto,
+    id_assunto: p.id_assunto,
+    assunto: stripHtml(p.assunto ?? ""),
     data: p.data,
     hora: p.hora,
     origem_setor: p.origem_setor,
     destino_setor: p.destino_setor,
     situacao_atual_str: p.situacao_atual_str,
-    emenda: extrairEmenda(p),
+    emenda: processoSocial ? undefined : extrairEmenda(p),
+    emenda_social: processoSocial ? extrairEmendaSocial(p) : undefined,
     movimentacoes: (p.movimentacoes ?? [])
       .filter((m) => m.data && m.data !== "0000-00-00")
       .map((m) => ({
