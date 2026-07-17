@@ -80,7 +80,8 @@ export default function BuscaProcessosClient({
   const searchParams = useSearchParams();
 
   // ── Modo Radar ────────────────────────────────────────────────────────────
-  const ID_ALVO = 1915747;
+  // IDs dos assuntos de emenda monitorados (espelha o filtro em onedoc.ts)
+  const IDS_ALVO = new Set([1915747, 1915739, 1915740]);
   const ITENS_META = 15;
   const MAX_PAGINAS = 50;
 
@@ -111,7 +112,7 @@ export default function BuscaProcessosClient({
         if (emissoes.length === 0) break; // API sem mais dados
   
         const matches = emissoes
-          .filter((e: any) => e.id_assunto === ID_ALVO)
+          .filter((e: any) => IDS_ALVO.has(e.id_assunto))
           .map(mapearProcesso);
   
         if (matches.length > 0) {
