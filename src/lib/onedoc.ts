@@ -13,6 +13,7 @@ interface OnedocMovimentacao {
   origem_setor: string;
   origem_id_usuario: string;
   origem_usuario: string; // recebido, mas omitido na saída pública (LGPD)
+  anexos?: OnedocAnexo[];
 }
 
 interface OnedocAnexo {
@@ -80,6 +81,7 @@ export interface MovimentacaoPublica {
   data: string;
   hora: string;
   origem_setor: string;
+  anexos?: AnexoPublico[];
 }
 
 export interface AnexoPublico {
@@ -108,14 +110,19 @@ export interface EmendaInfo {
 export interface EmendaSocialInfo {
   num_emenda:        string;  // orgaopedido_1hmg1t1h → "14/2025"
   ano:               string;  // orgaopedido           → "2025"
-  vereador_autor:    string;  // paciente_1hpjan1h     → "Homero Marques Filho"
   objeto:            string;  // divrequisitante        → "Repasse de recursos p/ TEA..."
   origem:            string;  // 4_1ha5rk1h            → "Municipal"
   modalidade:        string;  // rg_1hvcln1h           → "Emenda Individual Impositiva"
-  valor:             string;  // paciente_1hdyef1h      → formatarMoeda("35.000,00")
   cnpj_concessor:    string;  // cpf_1hui711h           → "44.543.981/0001-99"
   cnpj_beneficiaria: string;  // rg_1h5hxq1h           → "49.893.795/0001-01"
   razao_social:      string;  // responsave_1hl4nm1h   → "ASSOC DE PAIS E AMIGOS..."
+  
+  // Feature Preventiva: Preparado para múltiplos autores e soma
+  autores_repasses: {
+    nome: string;
+    valor: string;
+  }[];
+  valor_total: string;
 }
 
 export interface ProcessoPublico {
@@ -276,17 +283,24 @@ function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
   if (!isSocial(p)) return undefined;
   if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
 
+  const valorFormatado = formatarMoeda(p.paciente_1hdyef1h);
+  
   return {
     num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
     ano:               stripHtml(p.orgaopedido ?? ""),
-    vereador_autor:    stripHtml(p.paciente_1hpjan1h ?? ""),
     objeto:            stripHtml(p.divrequisitante ?? ""),
     origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""),  // campo com nome em dígito
     modalidade:        stripHtml(p.rg_1hvcln1h ?? ""),
-    valor:             formatarMoeda(p.paciente_1hdyef1h),
     cnpj_concessor:    stripHtml(p.cpf_1hui711h ?? ""),
     cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
     razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
+    
+    // Mock preventivo: mapeia o único autor que a API retorna hoje
+    autores_repasses: [{
+      nome: stripHtml(p.paciente_1hpjan1h ?? ""),
+      valor: valorFormatado
+    }],
+    valor_total: valorFormatado,
   };
 }
 
@@ -315,6 +329,16 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
         data: m.data,
         hora: m.hora,
         origem_setor: m.origem_setor ?? "",
+        anexos: (m.anexos ?? []).map((a) => {
+          const partes = a.arquivo.split(".");
+          const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
+          return {
+            arquivo: a.arquivo,
+            extensao: extensao.toLowerCase(),
+            tamanho_bytes: Number(a.tamanho),
+            tipo_mime: a.tipo,
+          };
+        }),
       })),
     anexos: (p.anexos ?? []).map((a) => {
       const partes = a.arquivo.split(".");
