@@ -189,19 +189,27 @@ function EmendaSocialBlock({ emenda }: { emenda: EmendaSocialInfo }) {
 
         <div>
           <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <Banknote className="h-3.5 w-3.5" /> Valor do Repasse
+            <Banknote className="h-3.5 w-3.5" /> Valor do Repasse (Total)
           </dt>
           <dd className="mt-1.5 text-base font-bold text-blue-900 dark:text-blue-100">
-            {emenda.valor}
+            {emenda.valor_total || (emenda as any).valor}
           </dd>
         </div>
 
-        <div>
+        <div className="sm:col-span-2">
           <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <Gavel className="h-3.5 w-3.5" /> Vereador Autor
+            <Gavel className="h-3.5 w-3.5" /> Autores dos Repasses
           </dt>
           <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
-            {emenda.vereador_autor}
+            <ul className="space-y-1">
+              {(emenda.autores_repasses || []).map((autor, idx) => (
+                <li key={idx} className="flex items-center gap-2">
+                  <span className="font-semibold">{autor.nome}</span>
+                  <span className="text-blue-700/60 dark:text-blue-300/60">—</span>
+                  <span>{autor.valor}</span>
+                </li>
+              ))}
+            </ul>
           </dd>
         </div>
 
@@ -390,6 +398,29 @@ export default async function DetalhesProcesso({
                             <div className="mt-1 text-xs font-medium text-muted-foreground">
                               {formatDateBR(mov.data, mov.hora)}
                             </div>
+                            
+                            {mov.anexos && mov.anexos.length > 0 && (
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {mov.anexos.map((anexo, aIdx) => (
+                                  <button
+                                    key={aIdx}
+                                    disabled
+                                    title="Download será disponibilizado na próxima fase de transparência"
+                                    className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-xs font-medium text-foreground">
+                                        {anexo.arquivo}
+                                      </p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {anexo.extensao.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
+                                      </p>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
