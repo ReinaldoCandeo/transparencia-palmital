@@ -19,7 +19,7 @@ import {
   ScrollText,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
-import { buscarDetalhe } from "@/lib/onedoc";
+import { supabase } from "@/lib/db-client";
 import type { EmendaInfo, EmendaSocialInfo } from "@/lib/onedoc";
 import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 
@@ -202,7 +202,7 @@ function EmendaSocialBlock({ emenda }: { emenda: EmendaSocialInfo }) {
           </dt>
           <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
             <ul className="space-y-1">
-              {(emenda.autores_repasses || []).map((autor, idx) => (
+              {(emenda.autores_repasses || []).map((autor: any, idx: number) => (
                 <li key={idx} className="flex items-center gap-2">
                   <span className="font-semibold">{autor.nome}</span>
                   <span className="text-blue-700/60 dark:text-blue-300/60">—</span>
@@ -232,9 +232,14 @@ export default async function DetalhesProcesso({
   params: Promise<{ hash: string }>;
 }) {
   const { hash } = await params;
-  const processo = await buscarDetalhe(hash);
+  
+  const { data: p } = await supabase
+    .from("processos_emendas")
+    .select("*")
+    .eq("hash", hash)
+    .single();
 
-  if (!processo) {
+  if (!p) {
     return (
       <PortalLayout>
         <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4">
@@ -248,6 +253,42 @@ export default async function DetalhesProcesso({
       </PortalLayout>
     );
   }
+
+  // Fallback seguro para arrays (JSONB)
+  const movimentacoes = Array.isArray(p.movimentacoes) ? p.movimentacoes : [];
+  const anexos = Array.isArray(p.anexos) ? p.anexos : [];
+
+  // Adaptadores para reaproveitar os componentes UI
+  const temSaude = !!p.emenda_num_emenda || !!p.emenda_origem;
+  const temSocial = !!p.social_num_emenda || !!p.social_origem;
+
+  const emendaSaude = temSaude ? {
+    origem: p.emenda_origem || "",
+    lei_portaria: p.emenda_lei_portaria || "",
+    funcao_legislativa: p.emenda_funcao_legislativa || "",
+    num_emenda: p.emenda_num_emenda || "",
+    num_proposta: p.emenda_num_proposta || "",
+    tipo: p.emenda_tipo || "",
+    bloco: p.emenda_bloco || "",
+    valor_disponibilizado: p.emenda_valor_formatado || "",
+    valor_raw: p.emenda_valor_raw || "",
+    exercicio: p.emenda_exercicio || "",
+    banco: p.emenda_banco || "",
+    justificativa: p.emenda_justificativa || "",
+  } : null;
+
+  const emendaSocial = temSocial ? {
+    num_emenda: p.social_num_emenda || "",
+    ano: p.social_ano || "",
+    objeto: p.social_objeto || "",
+    origem: p.social_origem || "",
+    modalidade: p.social_modalidade || "",
+    cnpj_concessor: p.social_cnpj_concessor || "",
+    cnpj_beneficiaria: p.social_cnpj_beneficiaria || "",
+    razao_social: p.social_razao_social || "",
+    valor_total: p.social_valor_total || "",
+    autores_repasses: Array.isArray(p.social_autores_repasses) ? p.social_autores_repasses : [],
+  } : null;
 
   return (
     <PortalLayout>
@@ -266,13 +307,13 @@ export default async function DetalhesProcesso({
               <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <h1 className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
-                    Autuação nº {processo.num_formatado}
+                    Autuação nº {p.num_formatado || `${p.num}/${p.ano}`}
                   </h1>
                   <p className="mt-2 text-lg font-medium text-muted-foreground">
-                    {processo.assunto}
+                    {p.assunto}
                   </p>
                 </div>
-                <StatusBadge status={processo.situacao_atual_str} />
+                <StatusBadge status={p.situacao_atual || "Indefinida"} />
               </div>
 
               <div className="mt-8 grid gap-6 rounded-xl bg-muted/40 p-5 sm:grid-cols-2 md:grid-cols-3">
@@ -281,7 +322,7 @@ export default async function DetalhesProcesso({
                     <Calendar className="h-4 w-4" /> Data de abertura
                   </dt>
                   <dd className="mt-1.5 text-sm font-medium text-foreground">
-                    {formatDateBR(processo.data, processo.hora)}
+                    {formatDateBR(p.data || "", p.hora || "")}
                   </dd>
                 </div>
                 <div>
@@ -289,7 +330,7 @@ export default async function DetalhesProcesso({
                     <Building className="h-4 w-4" /> Setor de origem
                   </dt>
                   <dd className="mt-1.5 text-sm font-medium text-foreground">
-                    {processo.origem_setor}
+                    {p.origem_setor}
                   </dd>
                 </div>
                 <div>
@@ -297,15 +338,15 @@ export default async function DetalhesProcesso({
                     <Building className="h-4 w-4" /> Setor atual (destino)
                   </dt>
                   <dd className="mt-1.5 text-sm font-medium text-foreground">
-                    {processo.destino_setor}
+                    {p.destino_setor}
                   </dd>
                 </div>
               </div>
             </div>
 
             {/* Bloco de Emenda Parlamentar */}
-            {processo.emenda && <EmendaBlock emenda={processo.emenda} />}
-            {processo.emenda_social && <EmendaSocialBlock emenda={processo.emenda_social} />}
+            {emendaSaude && <EmendaBlock emenda={emendaSaude as any} />}
+            {emendaSocial && <EmendaSocialBlock emenda={emendaSocial as any} />}
 
             {/* Documentos Anexados & Aviso LGPD */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
@@ -314,7 +355,7 @@ export default async function DetalhesProcesso({
                 <div className="text-sm">
                   <p className="font-semibold">Aviso de Privacidade — LGPD</p>
                   <p className="mt-1 opacity-90">
-                    {processo.emenda_social 
+                    {emendaSocial 
                       ? "Os documentos comprobatórios das parcerias e convênios estão sendo processados e serão disponibilizados nesta seção em breve, em cumprimento à LAI e ao MROSC."
                       : "Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), os arquivos originais estão restritos a acessos autenticados. Este portal exibe apenas os metadados dos documentos comprobatórios."}
                   </p>
@@ -326,9 +367,9 @@ export default async function DetalhesProcesso({
                 Anexados
               </h3>
 
-              {processo.anexos && processo.anexos.length > 0 ? (
+              {anexos.length > 0 ? (
                 <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {processo.anexos.map((doc, i) => (
+                  {anexos.map((doc: any, i: number) => (
                     <li
                       key={i}
                       className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
@@ -366,10 +407,10 @@ export default async function DetalhesProcesso({
 
               <div className="mt-8 flow-root">
                 <ul className="-mb-8">
-                  {processo.movimentacoes.map((mov, idx) => (
+                  {movimentacoes.map((mov: any, idx: number) => (
                     <li key={mov.id}>
                       <div className="relative pb-8">
-                        {idx !== processo.movimentacoes.length - 1 ? (
+                        {idx !== movimentacoes.length - 1 ? (
                           <span
                             className="absolute left-5 top-5 -ml-px h-full w-0.5 bg-border"
                             aria-hidden="true"
@@ -380,7 +421,7 @@ export default async function DetalhesProcesso({
                             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background ring-8 ring-card">
                               {idx === 0 ? (
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
-                              ) : idx === processo.movimentacoes.length - 1 ? (
+                              ) : idx === movimentacoes.length - 1 ? (
                                 <AlertCircle className="h-5 w-5 text-blue-500" />
                               ) : (
                                 <div className="h-2.5 w-2.5 rounded-full bg-primary" />
@@ -399,9 +440,9 @@ export default async function DetalhesProcesso({
                               {formatDateBR(mov.data, mov.hora)}
                             </div>
                             
-                            {mov.anexos && mov.anexos.length > 0 && (
+                            {Array.isArray(mov.anexos) && mov.anexos.length > 0 && (
                               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                {mov.anexos.map((anexo, aIdx) => (
+                                {mov.anexos.map((anexo: any, aIdx: number) => (
                                   <button
                                     key={aIdx}
                                     disabled
@@ -414,7 +455,7 @@ export default async function DetalhesProcesso({
                                         {anexo.arquivo}
                                       </p>
                                       <p className="text-[10px] text-muted-foreground">
-                                        {anexo.extensao.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
+                                        {anexo.extensao?.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
                                       </p>
                                     </div>
                                   </button>
@@ -427,7 +468,7 @@ export default async function DetalhesProcesso({
                     </li>
                   ))}
 
-                  {processo.movimentacoes.length === 0 && (
+                  {movimentacoes.length === 0 && (
                     <p className="text-sm text-muted-foreground pb-8">
                       Nenhuma movimentação registrada.
                     </p>
