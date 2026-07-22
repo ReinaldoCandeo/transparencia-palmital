@@ -78,31 +78,9 @@ export default function BuscaProcessosClient({
 
 
 
-  const [buscaDiretaNum, setBuscaDiretaNum] = useState("");
-  const [buscaDiretaAno, setBuscaDiretaAno] = useState(
-    new Date().getFullYear().toString()
-  );
+  const [termoBusca, setTermoBusca] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
-
-  const anosDisponiveis = Array.from({ length: 10 }, (_, i) =>
-    (new Date().getFullYear() - i).toString()
-  );
-  const meses = [
-    { value: "", label: "Todos os meses" },
-    { value: "01", label: "Janeiro" },
-    { value: "02", label: "Fevereiro" },
-    { value: "03", label: "Março" },
-    { value: "04", label: "Abril" },
-    { value: "05", label: "Maio" },
-    { value: "06", label: "Junho" },
-    { value: "07", label: "Julho" },
-    { value: "08", label: "Agosto" },
-    { value: "09", label: "Setembro" },
-    { value: "10", label: "Outubro" },
-    { value: "11", label: "Novembro" },
-    { value: "12", label: "Dezembro" },
-  ];
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -113,12 +91,23 @@ export default function BuscaProcessosClient({
   const handleBuscaDireta = async (e: React.FormEvent) => {
     e.preventDefault();
     setSearchError("");
-    if (!buscaDiretaNum || !buscaDiretaAno) return;
+    if (!termoBusca.trim()) return;
+
+    // Higienização à prova de 'Dedo Gordo'
+    const cleanInput = termoBusca.replace(/\s+/g, "").replace(/[\.\-\,]/g, "/");
+    const parts = cleanInput.split("/").filter(Boolean);
+    const num = parts[0];
+    const ano = parts[1] || "";
+
+    if (!num) {
+      setSearchError("Formato inválido. Digite o número do processo.");
+      return;
+    }
 
     setIsSearching(true);
     try {
       const res = await fetch(
-        `/api/processos/busca-direta?numero=${buscaDiretaNum}&ano=${buscaDiretaAno}`
+        `/api/processos/busca-direta?numero=${num}&ano=${ano}`
       );
       if (!res.ok) {
         setSearchError("Processo não encontrado no ano informado.");
@@ -175,25 +164,14 @@ export default function BuscaProcessosClient({
                 <div className="flex w-full sm:w-auto flex-1 items-center gap-2 pl-2 bg-background rounded-lg">
                   <Search className="h-5 w-5 text-muted-foreground ml-2" />
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     required
-                    value={buscaDiretaNum}
-                    onChange={(e) => setBuscaDiretaNum(e.target.value)}
-                    placeholder='Número (ex: 2504)'
+                    value={termoBusca}
+                    onChange={(e) => setTermoBusca(e.target.value)}
+                    placeholder='Ex: 2504 ou 2504/2026'
                     className="w-full bg-transparent py-2.5 px-2 text-sm outline-none placeholder:text-muted-foreground sm:text-base"
                   />
-                </div>
-
-                <div className="flex w-full sm:w-32 shrink-0 items-center gap-2 bg-background rounded-lg">
-                  <select
-                    value={buscaDiretaAno}
-                    onChange={(e) => setBuscaDiretaAno(e.target.value)}
-                    className="w-full bg-transparent py-2.5 px-3 text-sm outline-none text-foreground"
-                  >
-                    {anosDisponiveis.map((a) => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
                 </div>
 
                 <button
