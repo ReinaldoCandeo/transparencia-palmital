@@ -361,7 +361,7 @@ export interface PaginaResult {
   totalPaginas: number;
 }
 
-async function obterProcessosPaginadoInterno(
+export async function obterProcessosPaginadoInterno(
   pagina: number
 ): Promise<PaginaResult> {
   try {
@@ -447,7 +447,7 @@ interface OnedocDetalheResponse {
   data: OnedocProcesso[];
 }
 
-async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null> {
+export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null> {
   try {
     const { baseUrl, authHash } = getConfig();
 
