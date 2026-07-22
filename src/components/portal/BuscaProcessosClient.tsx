@@ -24,6 +24,22 @@ function formatDateBR(dataStr: string | null | undefined) {
   return `${dia}/${mes}/${ano}`;
 }
 
+function getAutorEmenda(p: ProcessoEmendaRow) {
+  if (p.social_autores_repasses && p.social_autores_repasses.length > 0) {
+    return p.social_autores_repasses.map((a: any) => a.nome).join(", ");
+  }
+
+  // Tenta extrair o nome do autor do final do campo "Assunto", que segue o padrão:
+  // "MAC - EMENDA FED - 39380003 - CEZINHA DE MADUREIRA"
+  if (p.assunto && p.assunto.includes("-")) {
+    const parts = p.assunto.split("-");
+    const autor = parts[parts.length - 1].trim();
+    if (autor) return autor;
+  }
+
+  return "Não identificado";
+}
+
 const STATUS_COLORS: Record<string, string> = {
   "Em Tramitação": "border-blue-500/20 bg-blue-500/10 text-blue-500",
   Concluído: "border-green-500/20 bg-green-500/10 text-green-500",
@@ -222,8 +238,7 @@ export default function BuscaProcessosClient({
                 <th className="px-4 py-3">Número/Ano</th>
                 <th className="px-4 py-3">Assunto</th>
                 <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3">Setor atual</th>
-                <th className="px-4 py-3">Situação</th>
+                <th className="px-4 py-3">Autor</th>
                 <th className="px-4 py-3 sr-only">Ações</th>
               </tr>
             </thead>
@@ -250,11 +265,8 @@ export default function BuscaProcessosClient({
                   <td className="px-4 py-4 text-muted-foreground">
                     {formatDateBR(p.data)}
                   </td>
-                  <td className="px-4 py-4 text-muted-foreground">
-                    {p.destino_setor}
-                  </td>
-                  <td className="px-4 py-4">
-                    <StatusBadge status={p.situacao_atual || "Indefinida"} />
+                  <td className="px-4 py-4 text-foreground font-medium">
+                    {getAutorEmenda(p)}
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Link
@@ -291,7 +303,6 @@ export default function BuscaProcessosClient({
                 <span className="font-mono text-sm font-semibold text-foreground">
                   {p.num_formatado}
                 </span>
-                <StatusBadge status={p.situacao_atual || "Indefinida"} />
               </div>
               <Link
                 href={`/processos/${p.hash}`}
@@ -310,9 +321,9 @@ export default function BuscaProcessosClient({
                 </div>
                 <div>
                   <dt className="uppercase tracking-wide text-[10px] font-semibold text-slate-500 dark:text-slate-300">
-                    Setor atual
+                    Autor (Deputado/Vereador)
                   </dt>
-                  <dd className="mt-0.5 text-foreground">{p.destino_setor}</dd>
+                  <dd className="mt-0.5 text-foreground font-medium">{getAutorEmenda(p)}</dd>
                 </div>
               </dl>
               <Link
