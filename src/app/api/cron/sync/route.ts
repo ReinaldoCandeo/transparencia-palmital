@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/db-admin";
 import { processoEmendaSchema, flattenProcessoParaRow } from "@/lib/schemas";
 import { obterProcessosPaginadoInterno, obterDetalheInterno } from "@/lib/onedoc";
+import { syncAnexoStorage } from "@/lib/storage-sync";
 
 // =========================================================================
 // ⏱️ PROTEÇÃO SERVERLESS VERCEL
@@ -46,7 +47,30 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      detalheCompleto.num_formatado = p.num_formatado;
+      // 3.5 Escopo Cirúrgico de Download (Sincronização Paralela no Storage)
+      const downloadAnexos = async (anexos: any[]) => {
+        if (!anexos || anexos.length === 0) return;
+        
+        const tasks = anexos
+          .filter((a) => a._url_original && !a.url_storage)
+          .map(async (a) => {
+            a.url_storage = await syncAnexoStorage(p.hash, a._url_original, a.arquivo);
+          });
+          
+        if (tasks.length > 0) {
+          await Promise.allSettled(tasks);
+        }
+      };
+      
+      // Monta e dispara todas as tarefas de sincronização simultaneamente
+      const syncTasks = [downloadAnexos(detalheCompleto.anexos || [])];
+      
+      for (const m of detalheCompleto.movimentacoes || []) {
+        syncTasks.push(downloadAnexos(m.anexos || []));
+      }
+
+      await Promise.allSettled(syncTasks);
+
       const payloadFlat = flattenProcessoParaRow(detalheCompleto);
       const result = processoEmendaSchema.safeParse(payloadFlat);
       if (result.success) {

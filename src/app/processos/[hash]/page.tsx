@@ -17,6 +17,7 @@ import {
   CalendarClock,
   CreditCard,
   ScrollText,
+  Download,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { supabase } from "@/lib/db-client";
@@ -382,12 +383,31 @@ export default async function DetalhesProcesso({
                           {doc.arquivo}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {doc.extensao.toUpperCase()} •{" "}
+                          {doc.extensao?.toUpperCase()} •{" "}
                           {doc.tamanho_bytes > 0
                             ? `${(doc.tamanho_bytes / 1024).toFixed(0)} KB`
                             : doc.tipo_mime}
                         </p>
                       </div>
+                      
+                      {doc.url_storage ? (
+                        <a
+                          href={doc.url_storage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md transition-colors text-xs font-medium ml-auto shrink-0"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Baixar
+                        </a>
+                      ) : (
+                        <button
+                          disabled
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground rounded-md text-xs font-medium cursor-not-allowed ml-auto shrink-0"
+                          title="Arquivo em processamento"
+                        >
+                          <Clock className="h-3.5 w-3.5" /> Processando...
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -442,24 +462,48 @@ export default async function DetalhesProcesso({
                             
                             {Array.isArray(mov.anexos) && mov.anexos.length > 0 && (
                               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                {mov.anexos.map((anexo: any, aIdx: number) => (
-                                  <button
-                                    key={aIdx}
-                                    disabled
-                                    title="Download será disponibilizado na próxima fase de transparência"
-                                    className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-70"
-                                  >
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <div className="min-w-0 flex-1">
-                                      <p className="truncate text-xs font-medium text-foreground">
-                                        {anexo.arquivo}
-                                      </p>
-                                      <p className="text-[10px] text-muted-foreground">
-                                        {anexo.extensao?.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
-                                      </p>
-                                    </div>
-                                  </button>
-                                ))}
+                                {mov.anexos.map((anexo: any, aIdx: number) => {
+                                  const renderAnexoContent = () => (
+                                    <>
+                                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-xs font-medium text-foreground">
+                                          {anexo.arquivo}
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground">
+                                          {anexo.extensao?.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
+                                        </p>
+                                      </div>
+                                    </>
+                                  );
+
+                                  if (anexo.url_storage) {
+                                    return (
+                                      <a
+                                        key={aIdx}
+                                        href={anexo.url_storage}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 rounded-md border border-border bg-blue-50/30 px-3 py-2 text-left transition-colors hover:bg-blue-50 hover:border-blue-200 group"
+                                      >
+                                        {renderAnexoContent()}
+                                        <Download className="h-4 w-4 shrink-0 text-blue-600 opacity-0 transition-opacity group-hover:opacity-100" />
+                                      </a>
+                                    );
+                                  }
+
+                                  return (
+                                    <button
+                                      key={aIdx}
+                                      disabled
+                                      title="Arquivo em processamento"
+                                      className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-left transition-colors hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                      {renderAnexoContent()}
+                                      <Clock className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                    </button>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>

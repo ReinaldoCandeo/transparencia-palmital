@@ -62,10 +62,12 @@ export const processoEmendaSchema = z.object({
       origem_setor: z.string(),
       anexos: z.array(
         z.object({
+          id_externo: z.string().optional(),
           arquivo: z.string(),
           extensao: z.string(),
           tamanho_bytes: z.number(),
           tipo_mime: z.string(),
+          url_storage: z.string().nullable().optional(),
         })
       ).optional(),
     })
@@ -73,10 +75,12 @@ export const processoEmendaSchema = z.object({
 
   anexos: z.array(
     z.object({
+      id_externo: z.string().optional(),
       arquivo: z.string(),
       extensao: z.string(),
       tamanho_bytes: z.number(),
       tipo_mime: z.string(),
+      url_storage: z.string().nullable().optional(),
     })
   ).nullable().default([]),
 });
