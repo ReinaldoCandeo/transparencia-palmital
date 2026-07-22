@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/db-admin";
 import { processoEmendaSchema, flattenProcessoParaRow } from "@/lib/schemas";
 import { obterProcessosPaginadoInterno, obterDetalheInterno } from "@/lib/onedoc";
+import { syncAnexoStorage } from "@/lib/storage-sync";
 
 // =========================================================================
 // ⏱️ PROTEÇÃO SERVERLESS VERCEL
@@ -47,6 +48,22 @@ export async function GET(req: NextRequest) {
       }
 
       detalheCompleto.num_formatado = p.num_formatado;
+
+      // 3.5 Escopo Cirúrgico de Download (Sincronização de Storage)
+      const downloadAnexos = async (anexos: any[]) => {
+        if (!anexos) return;
+        for (const a of anexos) {
+          if (a._url_original && !a.url_storage) {
+             a.url_storage = await syncAnexoStorage(p.hash, a._url_original, a.arquivo);
+          }
+        }
+      };
+      
+      await downloadAnexos(detalheCompleto.anexos || []);
+      for (const m of detalheCompleto.movimentacoes || []) {
+        await downloadAnexos(m.anexos || []);
+      }
+
       const payloadFlat = flattenProcessoParaRow(detalheCompleto);
       const result = processoEmendaSchema.safeParse(payloadFlat);
       if (result.success) {

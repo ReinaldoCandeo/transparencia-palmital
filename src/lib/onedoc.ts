@@ -85,10 +85,13 @@ export interface MovimentacaoPublica {
 }
 
 export interface AnexoPublico {
+  id_externo?: string;  // id original da 1doc
   arquivo: string;      // nome completo: "REQUIS_901.pdf"
   extensao: string;     // derivado: "pdf"
   tamanho_bytes: number;
   tipo_mime: string;    // "application/pdf"
+  url_storage?: string | null; // URL pública do Supabase Storage
+  _url_original?: string; // Temporário durante o sync, não usar no frontend!
 }
 
 /** Dados públicos da emenda parlamentar (agência e nº conta OMITIDOS por segurança) */
@@ -333,10 +336,12 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
           const partes = a.arquivo.split(".");
           const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
           return {
+            id_externo: a.id_anexo,
             arquivo: a.arquivo,
             extensao: extensao.toLowerCase(),
             tamanho_bytes: Number(a.tamanho),
             tipo_mime: a.tipo,
+            _url_original: a.url_original,
           };
         }),
       })),
@@ -344,10 +349,12 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
       const partes = a.arquivo.split(".");
       const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
       return {
+        id_externo: a.id_anexo,
         arquivo: a.arquivo,
         extensao: extensao.toLowerCase(),
         tamanho_bytes: Number(a.tamanho),
         tipo_mime: a.tipo,
+        _url_original: a.url_original,
       };
     }),
   };
