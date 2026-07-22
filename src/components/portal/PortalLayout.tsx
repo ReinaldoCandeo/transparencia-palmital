@@ -9,8 +9,7 @@ export function PortalLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem("portal-theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = stored ? stored === "dark" : prefersDark;
+    const initial = stored === "dark"; // Modo claro por padrão se não houver preferência salva
     setDark(initial);
     document.documentElement.classList.toggle("dark", initial);
   }, []);
