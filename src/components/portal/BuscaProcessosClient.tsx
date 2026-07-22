@@ -13,11 +13,11 @@ import {
   Clock3,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
-import type { ProcessoPublico } from "@/lib/onedoc";
+import type { ProcessoEmendaRow } from "@/lib/schemas";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-function formatDateBR(dataStr: string) {
+function formatDateBR(dataStr: string | null | undefined) {
   if (!dataStr) return "";
   if (!dataStr.includes("/")) return dataStr;
   const [dia, mes, ano] = dataStr.split("/");
@@ -45,26 +45,6 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ─── Mapeamento de tipagem (Radar) ────────────────────────────────────────
-
-function mapearProcesso(raw: any): ProcessoPublico {
-  return {
-    hash: raw.hash ?? "",
-    num: String(raw.num ?? ""),
-    ano: String(raw.ano ?? ""),
-    num_formatado: raw.num_formatado ?? "",
-    id_assunto: raw.id_assunto ?? 0,
-    assunto: raw.assunto ?? "",
-    data: raw.data ?? "",
-    hora: raw.hora ?? "",
-    origem_setor: raw.origem_setor ?? "",
-    destino_setor: raw.destino_setor ?? "",
-    situacao_atual_str: raw.situacao_atual_str ?? "",
-    movimentacoes: [],
-    anexos: [],
-  };
-}
-
 // ─── Componente principal ─────────────────────────────────────────────────
 
 export default function BuscaProcessosClient({
@@ -72,7 +52,7 @@ export default function BuscaProcessosClient({
   paginaAtual,
   totalPaginas,
 }: {
-  processos: ProcessoPublico[];
+  processos: ProcessoEmendaRow[];
   paginaAtual: number;
   totalPaginas: number;
 }) {
@@ -80,61 +60,7 @@ export default function BuscaProcessosClient({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // ── Modo Radar ────────────────────────────────────────────────────────────
-  // IDs dos assuntos de emenda monitorados (espelha o filtro em onedoc.ts)
-  const IDS_ALVO = new Set([1915747, 1915739, 1915740]);
-  const ITENS_META = 15;
-  const MAX_PAGINAS = 50;
 
-  const [radarAtivo, setRadarAtivo] = useState(true);
-  const [paginaRadar, setPaginaRadar] = useState(1);
-  const [processosRadar, setProcessosRadar] = useState<ProcessoPublico[]>([]);
-
-  useEffect(() => {
-    let cancelado = false;
-  
-    (async () => {
-      const coletados: ProcessoPublico[] = [];
-  
-      for (let pag = 1; pag <= MAX_PAGINAS; pag++) {
-        if (cancelado) return;
-        setPaginaRadar(pag);
-  
-        const res = await fetch(`/api/processos/bruto?pagina=${pag}`);
-        if (!res.ok) {
-          const erroDetalhe = await res.text();
-          console.error(`[Radar] Bloqueio na página ${pag}:`, res.status, erroDetalhe);
-          break;
-        }
-  
-        const json = await res.json();
-        const emissoes: any[] = json?.data?.[0]?.emissoes ?? [];
-  
-        if (emissoes.length === 0) break; // API sem mais dados
-  
-        const matches = emissoes
-          .filter((e: any) => IDS_ALVO.has(e.id_assunto))
-          .map(mapearProcesso);
-  
-        if (matches.length > 0) {
-          coletados.push(...matches);
-          setProcessosRadar([...coletados]);
-        }
-  
-        if (coletados.length >= ITENS_META) break;
-
-        // Respiro Anti-DDoS obrigatorio para proteger a infraestrutura e evitar o Rate Limit
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-  
-      if (!cancelado) {
-        setProcessosRadar(coletados.slice(0, ITENS_META));
-        setRadarAtivo(false);
-      }
-    })();
-  
-    return () => { cancelado = true; };
-  }, []);
 
   const [buscaDiretaNum, setBuscaDiretaNum] = useState("");
   const [buscaDiretaAno, setBuscaDiretaAno] = useState(
@@ -286,18 +212,7 @@ export default function BuscaProcessosClient({
           </div>
         </div>
 
-        {radarAtivo && (
-          <div className="mt-6 flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-            </span>
-            Varrendo processos...{" "}
-            <span className="font-mono font-semibold text-muted-foreground ml-auto">
-              (Página {paginaRadar}/50 — {processosRadar.length}/15 encontrados)
-            </span>
-          </div>
-        )}
+
 
         {/* Tabela (desktop) */}
         <div className="mt-6 hidden overflow-hidden rounded-xl border border-border bg-card md:block">
@@ -313,7 +228,7 @@ export default function BuscaProcessosClient({
               </tr>
             </thead>
             <tbody>
-              {processosRadar.map((p) => (
+              {processos.map((p) => (
                 <tr
                   key={p.hash}
                   className="group border-t border-border transition-colors hover:bg-muted/40"
@@ -339,7 +254,7 @@ export default function BuscaProcessosClient({
                     {p.destino_setor}
                   </td>
                   <td className="px-4 py-4">
-                    <StatusBadge status={p.situacao_atual_str} />
+                    <StatusBadge status={p.situacao_atual || "Indefinida"} />
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Link
@@ -351,7 +266,7 @@ export default function BuscaProcessosClient({
                   </td>
                 </tr>
               ))}
-              {processosRadar.length === 0 && !radarAtivo && (
+              {processos.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -367,7 +282,7 @@ export default function BuscaProcessosClient({
 
         {/* Cards (mobile) */}
         <ul className="mt-6 grid gap-4 md:hidden list-none p-0 m-0">
-          {processosRadar.map((p) => (
+          {processos.map((p) => (
             <li
               key={p.hash}
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
@@ -376,7 +291,7 @@ export default function BuscaProcessosClient({
                 <span className="font-mono text-sm font-semibold text-foreground">
                   {p.num_formatado}
                 </span>
-                <StatusBadge status={p.situacao_atual_str} />
+                <StatusBadge status={p.situacao_atual || "Indefinida"} />
               </div>
               <Link
                 href={`/processos/${p.hash}`}
@@ -408,7 +323,7 @@ export default function BuscaProcessosClient({
               </Link>
             </li>
           ))}
-          {processosRadar.length === 0 && !radarAtivo && (
+          {processos.length === 0 && (
             <li className="p-8 text-center text-sm text-muted-foreground border border-border rounded-xl">
                Nenhum processo encontrado.
             </li>
