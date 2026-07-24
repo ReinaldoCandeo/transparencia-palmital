@@ -23,6 +23,10 @@ import { PortalLayout } from "@/components/portal/PortalLayout";
 import { supabase } from "@/lib/db-client";
 import type { EmendaInfo, EmendaSocialInfo } from "@/lib/onedoc";
 import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
+import { after } from "next/server";
+import { obterDetalheInterno } from "@/lib/onedoc";
+import { flattenProcessoParaRow } from "@/lib/schemas";
+import { supabaseAdmin } from "@/lib/db-admin";
 
 function formatDateBR(dataStr: string, horaStr?: string) {
   if (!dataStr) return "";
@@ -253,6 +257,43 @@ export default async function DetalhesProcesso({
         </div>
       </PortalLayout>
     );
+  }
+
+  // Verifica se devemos fazer SWR (TTL de 3 dias)
+  const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
+  const ultimaSinc = p.ultima_sincronizacao ? new Date(p.ultima_sincronizacao).getTime() : 0;
+  const agora = Date.now();
+  const deveSincronizar = (agora - ultimaSinc) > tresDiasMs;
+
+  if (deveSincronizar) {
+    after(async () => {
+      try {
+        console.log(`[SWR] Iniciando sync reativo (TTL) para o processo ${p.num}/${p.ano} (hash: ${hash})`);
+        const processoDetail = await obterDetalheInterno(hash);
+        
+        if (processoDetail) {
+          const row = flattenProcessoParaRow(processoDetail);
+          
+          const qtdeAntiga = Array.isArray(p.movimentacoes) ? p.movimentacoes.length : 0;
+          const qtdeNova = Array.isArray(row.movimentacoes) ? row.movimentacoes.length : 0;
+
+          if (qtdeAntiga !== qtdeNova || ultimaSinc === 0) {
+            console.log(`[SWR] Diferença detectada (ou 1ª vez). Executando Upsert no processo ${hash}`);
+            const { error } = await supabaseAdmin.from("processos_emendas").upsert(row);
+            if (error) console.error(`[SWR] Erro no upsert:`, error);
+          } else {
+            console.log(`[SWR] Nenhuma novidade no processo ${hash}. Atualizando apenas ultima_sincronizacao.`);
+            const { error } = await supabaseAdmin
+              .from("processos_emendas")
+              .update({ ultima_sincronizacao: new Date().toISOString() })
+              .eq("hash", hash);
+            if (error) console.error(`[SWR] Erro no update do TTL:`, error);
+          }
+        }
+      } catch (err) {
+        console.error(`[SWR] Falha no background sync do processo ${hash}:`, err);
+      }
+    });
   }
 
   // Fallback seguro para arrays (JSONB)

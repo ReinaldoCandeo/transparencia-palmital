@@ -219,6 +219,21 @@ function formatarMoeda(valor: string | undefined): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
 }
 
+/** 
+ * Higienização estrita de string de moeda BRL para Float.
+ * Remove 'R$', espaços, pontos de milhar e converte vírgula decimal para ponto.
+ */
+function parseMoedaToFloat(valor: string | undefined): number {
+  if (!valor) return 0;
+  const limpo = valor
+    .replace(/R\$/g, "")
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(/,/g, ".");
+  const floatVal = parseFloat(limpo);
+  return isNaN(floatVal) ? 0 : floatVal;
+}
+
 /** Converte data ISO ("2026-12-31") para formato brasileiro ("31/12/2026").
  * Se já estiver em DD/MM/AAAA, retorna como está.
  */
@@ -315,6 +330,12 @@ function extrairEmendaMunicipal(p: OnedocProcesso): EmendaSocialInfo | undefined
   const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
   const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
 
+  let valor_total_calculado = valorFormatado;
+  if (autores.length > 0) {
+    const soma = autores.reduce((acc, a) => acc + parseMoedaToFloat(a.valor), 0);
+    valor_total_calculado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(soma);
+  }
+
   return {
     num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
     ano:               stripHtml(p.orgaopedido ?? ""), // orgaopedido = Ano no Municipal
@@ -325,7 +346,7 @@ function extrairEmendaMunicipal(p: OnedocProcesso): EmendaSocialInfo | undefined
     cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
     razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
     autores_repasses:  autores,
-    valor_total:       valorFormatado,
+    valor_total:       valor_total_calculado,
   };
 }
 
@@ -335,6 +356,12 @@ function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
   const valorFormatado = formatarMoeda(p.paciente_1hdyef1h);
   const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
   const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
+
+  let valor_total_calculado = valorFormatado;
+  if (autores.length > 0) {
+    const soma = autores.reduce((acc, a) => acc + parseMoedaToFloat(a.valor), 0);
+    valor_total_calculado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(soma);
+  }
 
   return {
     num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
@@ -346,7 +373,7 @@ function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
     cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
     razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
     autores_repasses:  autores,
-    valor_total:       valorFormatado,
+    valor_total:       valor_total_calculado,
   };
 }
 
