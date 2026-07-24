@@ -20,6 +20,7 @@ export const processoEmendaSchema = z.object({
   origem_setor: z.string().nullable().optional(),
   destino_setor: z.string().nullable().optional(),
   situacao_atual: z.string().nullable().optional(),
+  ultima_sincronizacao: z.string().optional(),
 
   // EmendaInfo (Saúde) - 1915747
   emenda_origem: z.string().nullable().optional(),
@@ -95,7 +96,7 @@ export type ProcessoEmendaRow = z.infer<typeof processoEmendaSchema>;
  * para o formato flat exigido pelo schema do Zod (e pela tabela do Supabase).
  */
 export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
-  return {
+  const row: ProcessoEmendaRow = {
     ...p,
     // Achata campos de emenda de Saúde
     emenda_origem: p.emenda?.origem ?? null,
@@ -123,6 +124,14 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
     social_valor_total: p.emenda_social?.valor_total ?? null,
     social_autores_repasses: p.emenda_social?.autores_repasses ?? [],
     
-    situacao_atual: p.situacao_atual_str ?? null
+    destino_setor: p.destino_setor,
+    situacao_atual: p.situacao_atual_str,
+    ultima_sincronizacao: new Date().toISOString(),
   };
+
+  // Remove os objetos aninhados originais para evitar erro PGRST204 no Supabase
+  // pois essas colunas não existem na tabela SQL.
+  const { emenda, emenda_social, situacao_atual_str, ...rowLimpa } = row as any;
+  
+  return rowLimpa as ProcessoEmendaRow;
 }
