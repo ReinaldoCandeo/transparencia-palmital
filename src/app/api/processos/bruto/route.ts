@@ -9,8 +9,48 @@ export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET || authHeader !== expectedSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  // ─────────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────
 
+  const baseUrl = process.env.ONEDOC_BASE_URL;
+  const authHash = process.env.ONEDOC_AUTH_HASH;
+
+  if (!baseUrl || !authHash) {
+    return NextResponse.json(
+      { error: "Erro Crítico: Variáveis ONEDOC_BASE_URL ou ONEDOC_AUTH_HASH não configuradas." },
+      { status: 500 }
+    );
+  }
+
+  // ── MODO INSPECÇÃO POR HASH (?hash=XXXX) ───────────────────────────────────
+  // Bate diretamente no endpoint de detalhe da 1Doc e retorna o payload bruto.
+  // Útil para: (1) investigar falhas do cron, (2) mapear campos obfuscados.
+  const hash = req.nextUrl.searchParams.get("hash");
+  if (hash) {
+    try {
+      const res = await fetch(
+        `${baseUrl}/processos-administrativos/${hash}/despachos?pagina=1`,
+        { headers: { "X-Auth-Hash": authHash }, cache: "no-store" }
+      );
+
+      const payload = res.ok ? await res.json() : null;
+
+      return NextResponse.json({
+        hash,
+        status_1doc: res.status,
+        status_text: res.statusText,
+        ok: res.ok,
+        payload,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { hash, error: "Erro ao consultar 1Doc", detalhe: String(error) },
+        { status: 500 }
+      );
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
+  // ── MODO LISTAGEM PAGINADA (?pagina=X) ────────────────────────────────────
   const paginaStr = req.nextUrl.searchParams.get("pagina") ?? "1";
   const pagina = parseInt(paginaStr, 10);
 
@@ -18,24 +58,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Página inválida" }, { status: 400 });
   }
 
-  // 1. BLINDAGEM DE AMBIENTE: Pega as variáveis antes de qualquer coisa
-  const baseUrl = process.env.ONEDOC_BASE_URL;
-  const authHash = process.env.ONEDOC_AUTH_HASH;
-
-  if (!baseUrl || !authHash) {
-    return NextResponse.json(
-      { error: "Erro Crítico: Variáveis ONEDOC_BASE_URL ou ONEDOC_AUTH_HASH não configuradas na Vercel (Ambiente Preview)." },
-      { status: 500 }
-    );
-  }
-
   try {
-    // 2. CACHE NATIVO: Usando o fetch patch do Next.js (estável em Route Handlers)
     const res = await fetch(
       `${baseUrl}/processos-administrativos?pagina=${pagina}`,
-      { 
+      {
         headers: { "X-Auth-Hash": authHash },
-        next: { revalidate: 300, tags: ["onedoc-bruta", String(pagina)] } // Cache explícito e seguro
+        next: { revalidate: 300, tags: ["onedoc-bruta", String(pagina)] }
       }
     );
 

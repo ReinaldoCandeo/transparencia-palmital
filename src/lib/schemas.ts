@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProcessoPublico } from "./onedoc";
 
 /**
  * Schema Zod de validação rigorosa para a tabela `processos_emendas`.
@@ -48,6 +49,7 @@ export const processoEmendaSchema = z.object({
   // --- BLOCOS COMPLEXOS (Fallback Inteligente com Tipagem Estrita) ---
   social_autores_repasses: z.array(
     z.object({
+      num_emenda: z.string().optional(),
       nome: z.string(),
       valor: z.string(),
     })
@@ -92,7 +94,7 @@ export type ProcessoEmendaRow = z.infer<typeof processoEmendaSchema>;
  * Função utilitária para "achatar" (flatten) o payload hierárquico da 1Doc
  * para o formato flat exigido pelo schema do Zod (e pela tabela do Supabase).
  */
-export function flattenProcessoParaRow(p: any): any {
+export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
   return {
     ...p,
     // Achata campos de emenda de Saúde
@@ -121,6 +123,6 @@ export function flattenProcessoParaRow(p: any): any {
     social_valor_total: p.emenda_social?.valor_total ?? null,
     social_autores_repasses: p.emenda_social?.autores_repasses ?? [],
     
-    situacao_atual: p.situacao_atual_str ?? p.situacao_atual ?? null
+    situacao_atual: p.situacao_atual_str ?? null
   };
 }
