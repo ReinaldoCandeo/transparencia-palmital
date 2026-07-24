@@ -122,6 +122,7 @@ export interface EmendaSocialInfo {
   
   // Feature Preventiva: Preparado para múltiplos autores e soma
   autores_repasses: {
+    num_emenda?: string;
     nome: string;
     valor: string;
   }[];
@@ -259,21 +260,21 @@ function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
   };
 }
 
-const ASSUNTOS_SOCIAL = new Set([1915739, 1915740]);
+const ASSUNTOS_TERCEIRO_SETOR = new Set([1915739, 1915740]);
 
-function isSocial(p: OnedocProcesso): boolean {
+function isTerceiroSetor(p: OnedocProcesso): boolean {
   // 1. Tenta por ID ou texto do assunto se estiverem perfeitamente classificados
-  if (p.id_assunto && ASSUNTOS_SOCIAL.has(Number(p.id_assunto))) return true;
+  if (p.id_assunto && ASSUNTOS_TERCEIRO_SETOR.has(Number(p.id_assunto))) return true;
   if (p.assunto && p.assunto.toLowerCase().includes("terceiro setor")) return true;
 
   // 2. Heurística de Conteúdo (Solução Arquitetural Padrão para API /despachos)
-  // O campo 'rg_1h5hxq1h' armazena o "Exercício" (Saúde, ~4 dígitos) ou "CNPJ Beneficiária" (Social)
+  // O campo 'rg_1h5hxq1h' armazena o "Exercício" (Saúde, ~4 dígitos) ou "CNPJ Beneficiária" (Terceiro Setor)
   const rgValue = stripHtml(p.rg_1h5hxq1h ?? "").trim();
   if (rgValue.length > 10 && rgValue.includes("/")) {
     return true; // Contém barra e tem tamanho compatível com CNPJ
   }
 
-  // O campo 'cpf_1hui711h' armazena "Banco" (Saúde, Texto) ou "CNPJ Concessor" (Social)
+  // O campo 'cpf_1hui711h' armazena "Banco" (Saúde, Texto) ou "CNPJ Concessor" (Terceiro Setor)
   const cpfValue = stripHtml(p.cpf_1hui711h ?? "").trim();
   if (cpfValue.length > 10 && /^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$/.test(cpfValue)) {
     return true; // Match exato com regex de CNPJ formatado
@@ -282,39 +283,84 @@ function isSocial(p: OnedocProcesso): boolean {
   return false;
 }
 
-function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
-  if (!isSocial(p)) return undefined;
+function extrairAutoresRegex(p: OnedocProcesso, autorPrincipalNome: string, valorFormatado: string) {
+  const autores: EmendaSocialInfo["autores_repasses"] = [];
+  if (autorPrincipalNome) {
+    autores.push({ nome: autorPrincipalNome, valor: valorFormatado });
+  }
+
+  if (p.conteudo) {
+    const textoConteudo = stripHtml(p.conteudo);
+    const regexAutoresExtra = /N[º°o]?\s*da\s*Emenda:\s*(?<numEmenda>[^;]+?)\s*;\s*Vereador\s*Autor:\s*(?<nome>[^;]+?)\s*;\s*Valor:\s*(?<valor>[\d\.,]+)/gi;
+    let match;
+    while ((match = regexAutoresExtra.exec(textoConteudo)) !== null) {
+      if (!match.groups) continue;
+      
+      const numEmendaExtra = match.groups.numEmenda.trim();
+      const nomeAutorExtra = match.groups.nome.trim();
+      const valorAutorExtra = formatarMoeda(match.groups.valor.trim());
+      
+      if (nomeAutorExtra && valorAutorExtra && nomeAutorExtra.toLowerCase() !== autorPrincipalNome.toLowerCase()) {
+        autores.push({ num_emenda: numEmendaExtra, nome: nomeAutorExtra, valor: valorAutorExtra });
+      }
+    }
+  }
+  return autores;
+}
+
+function extrairEmendaMunicipal(p: OnedocProcesso): EmendaSocialInfo | undefined {
   if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
 
   const valorFormatado = formatarMoeda(p.paciente_1hdyef1h);
-  
+  const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
+  const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
+
   return {
     num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
-    ano:               stripHtml(p.orgaopedido ?? ""),
+    ano:               stripHtml(p.orgaopedido ?? ""), // orgaopedido = Ano no Municipal
     objeto:            stripHtml(p.divrequisitante ?? ""),
-    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""),  // campo com nome em dígito
+    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""), // 4_1ha5rk1h = Origem no Municipal
     modalidade:        stripHtml(p.rg_1hvcln1h ?? ""),
     cnpj_concessor:    stripHtml(p.cpf_1hui711h ?? ""),
     cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
     razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
-    
-    // Mock preventivo: mapeia o único autor que a API retorna hoje
-    autores_repasses: [{
-      nome: stripHtml(p.paciente_1hpjan1h ?? ""),
-      valor: valorFormatado
-    }],
-    valor_total: valorFormatado,
+    autores_repasses:  autores,
+    valor_total:       valorFormatado,
+  };
+}
+
+function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
+  if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
+
+  const valorFormatado = formatarMoeda(p.paciente_1hdyef1h);
+  const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
+  const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
+
+  return {
+    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
+    ano:               "", // Não temos o mapeamento do ano no Social ainda
+    objeto:            stripHtml(p.divrequisitante ?? ""),
+    origem:            stripHtml(p.orgaopedido ?? ""),  // orgaopedido = Origem no Social
+    modalidade:        stripHtml(p.rg_1hvcln1h ?? ""),
+    cnpj_concessor:    stripHtml(p.cpf_1hui711h ?? ""),
+    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
+    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
+    autores_repasses:  autores,
+    valor_total:       valorFormatado,
   };
 }
 
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
-  const processoSocial = isSocial(p);
+  const processoTerceiroSetor = isTerceiroSetor(p);
 
   return {
     hash: p.hash,
     num: String(p.num),
     ano: String(p.ano),
-    num_formatado: p.num_formatado,
+    // Bug da 1Doc: o endpoint /despachos retorna num_formatado vazio.
+    // Fallback: constrói o formato brasileiro a partir de num + ano.
+    // Ex: num=2663, ano=2026 → "2.663/2026"
+    num_formatado: p.num_formatado || `${Number(p.num).toLocaleString("pt-BR")}/${p.ano}`,
     id_assunto: p.id_assunto,
     assunto: stripHtml(p.assunto ?? ""),
     data: p.data,
@@ -322,8 +368,8 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     origem_setor: p.origem_setor,
     destino_setor: p.destino_setor,
     situacao_atual_str: p.situacao_atual_str,
-    emenda: processoSocial ? undefined : extrairEmenda(p),
-    emenda_social: processoSocial ? extrairEmendaSocial(p) : undefined,
+    emenda: processoTerceiroSetor ? undefined : extrairEmenda(p),
+    emenda_social: processoTerceiroSetor ? (p.id_assunto === 1915739 ? extrairEmendaMunicipal(p) : extrairEmendaSocial(p)) : undefined,
     movimentacoes: (p.movimentacoes ?? [])
       .filter((m) => m.data && m.data !== "0000-00-00")
       .map((m) => ({
@@ -465,11 +511,17 @@ export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico
       }
     );
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[1Doc] Detalhe ${hash}: HTTP ${res.status} ${res.statusText}`);
+      return null;
+    }
 
     const json: OnedocDetalheResponse = await res.json();
     const processo = json.data?.[0] ?? null;
-    if (!processo) return null;
+    if (!processo) {
+      console.warn(`[1Doc] Detalhe ${hash}: API retornou data vazio (processo sem despachos ou recém-criado)`);
+      return null;
+    }
 
     // ── FASE 1 - MAPEAMENTO: Inspeciona o campo `conteudo` bruto ──────────
     // Logs de diagnóstico removidos (LGPD / Segurança)
