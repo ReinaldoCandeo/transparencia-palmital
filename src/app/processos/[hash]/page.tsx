@@ -259,11 +259,11 @@ export default async function DetalhesProcesso({
     );
   }
 
-  // Verifica se devemos fazer SWR (TTL de 7 dias)
-  const seteDiasMs = 7 * 24 * 60 * 60 * 1000;
+  // Verifica se devemos fazer SWR (TTL de 3 dias)
+  const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
   const ultimaSinc = p.ultima_sincronizacao ? new Date(p.ultima_sincronizacao).getTime() : 0;
   const agora = Date.now();
-  const deveSincronizar = (agora - ultimaSinc) > seteDiasMs;
+  const deveSincronizar = (agora - ultimaSinc) > tresDiasMs;
 
   if (deveSincronizar) {
     after(async () => {
