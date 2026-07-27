@@ -35,10 +35,44 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, message: "Nenhum processo retornado." });
     }
 
+    // 2.5 Consulta Prévia Otimizada no Banco (Batching Incremental)
+    const hashes = processos.map((p) => p.hash);
+    const { data: dbProcessos } = await supabaseAdmin
+      .from("processos_emendas")
+      .select("hash, ultima_sincronizacao")
+      .in("hash", hashes);
+
+    const dbMap = new Map(dbProcessos?.map((d) => [d.hash, d]) || []);
+    
+    // Gatilho por TTL (3 dias)
+    const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
+    const agora = Date.now();
+
+    const processosParaSincronizar = processos.filter((p) => {
+      const dbProc = dbMap.get(p.hash);
+      if (!dbProc) return true; // Novo processo
+      
+      const ultimaSinc = dbProc.ultima_sincronizacao
+        ? new Date(dbProc.ultima_sincronizacao).getTime()
+        : 0;
+      
+      return (agora - ultimaSinc) > tresDiasMs;
+    });
+
+    // Funil de Segurança: Máximo de 2 processos por vez
+    const processosLimitados = processosParaSincronizar.slice(0, 2);
+
+    if (processosLimitados.length === 0) {
+      console.log("⏱️ [CRON] Nenhum processo novo ou desatualizado para sincronizar.");
+      return NextResponse.json({ ok: true, message: "Tudo atualizado." });
+    }
+
+    console.log(`⏱️ [CRON] Encontrados ${processosParaSincronizar.length} processos pendentes. Sincronizando batch de ${processosLimitados.length}...`);
+
     const safeProcessos = [];
 
-    // 3. Validação Individual (Zod)
-    for (const p of processos) {
+    // 3. Validação Individual (Zod) - Agora rodando apenas na fila limitada
+    for (const p of processosLimitados) {
       // O endpoint de paginação NÃO retorna os dados do formulário de emenda.
       // Precisamos bater no endpoint de detalhes usando o hash para ter o payload completo!
       const detalheCompleto = await obterDetalheInterno(p.hash);
