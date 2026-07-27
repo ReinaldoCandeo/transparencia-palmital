@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/db-admin";
-import { processoEmendaSchema, flattenProcessoParaRow } from "@/lib/schemas";
-import { obterProcessosPaginadoInterno, obterDetalheInterno } from "@/lib/onedoc";
-import { syncAnexoStorage } from "@/lib/storage-sync";
+import { obterProcessosPaginadoInterno } from "@/lib/onedoc";
+import { syncProcessByHash } from "@/lib/sync-core";
 
 // =========================================================================
 // ⏱️ PROTEÇÃO SERVERLESS VERCEL
@@ -42,7 +41,7 @@ export async function GET(req: NextRequest) {
       .select("hash, ultima_sincronizacao, anexos, movimentacoes")
       .in("hash", hashes);
 
-    const dbMap = new Map(dbProcessos?.map((d) => [d.hash, d]) || []);
+    const dbMap = new Map<string, any>(dbProcessos?.map((d: any) => [d.hash, d]) || []);
     
     // Gatilho por TTL (3 dias)
     const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
@@ -87,87 +86,17 @@ export async function GET(req: NextRequest) {
     let timeExceeded = false;
     const safeProcessos = [];
 
-    // 3. Validação Individual (Zod) - Agora rodando apenas na fila limitada
+    // 3. Validação e Sincronização via Camada Core
     for (const p of processosLimitados) {
       if (timeExceeded) break; // Sai se o tempo geral estourou no processo anterior
 
-      // O endpoint de paginação NÃO retorna os dados do formulário de emenda.
-      // Precisamos bater no endpoint de detalhes usando o hash para ter o payload completo!
-      const detalheCompleto = await obterDetalheInterno(p.hash);
-      if (!detalheCompleto) {
-        console.error(`[CRON] Erro ao buscar detalhes do processo ${p.num_formatado} (${p.hash}). Ignorando.`);
-        continue;
-      }
-
-      // Prepara mapa de URLs existentes para não baixar o que já temos
-      const dbData = dbMap.get(p.hash);
-      const existingUrls = new Map<string, string>();
-      if (dbData) {
-        if (Array.isArray(dbData.anexos)) {
-          dbData.anexos.forEach((a: any) => { if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage) });
-        }
-        if (Array.isArray(dbData.movimentacoes)) {
-          dbData.movimentacoes.forEach((m: any) => {
-            if (Array.isArray(m.anexos)) m.anexos.forEach((a: any) => { if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage) });
-          });
-        }
-      }
-
-      // 3.5 Escopo Cirúrgico de Download (Sincronização Sequencial e Progressiva no Storage)
-      const downloadAnexosSequencial = async (anexos: any[]) => {
-        if (!anexos || anexos.length === 0) return;
-        
-        for (const a of anexos) {
-          if (!a._url_original) continue;
-          
-          // Se já baixamos antes (Cache), apenas reaproveita a URL
-          if (existingUrls.has(a.arquivo)) {
-            a.url_storage = existingUrls.get(a.arquivo);
-            continue;
-          }
-
-          if (a.url_storage) continue;
-
-          // Circuit Breaker: Verifica o relógio antes de iniciar um novo download
-          if (Date.now() - cronStartTime > TIMEOUT_MS) {
-            timeExceeded = true;
-            console.warn(`[CRON] Timeout de ${TIMEOUT_MS}ms atingido. Pausando downloads do processo ${p.hash}...`);
-            break;
-          }
-
-          // Baixa um por vez (Evita OOM e Network Congestion)
-          a.url_storage = await syncAnexoStorage(p.hash, a._url_original, a.arquivo);
-        }
-      };
+      const result = await syncProcessByHash(p.hash, TIMEOUT_MS);
       
-      // Executa o download sequencial progressivo
-      if (!timeExceeded) {
-        await downloadAnexosSequencial(detalheCompleto.anexos || []);
-      }
-      
-      for (const m of detalheCompleto.movimentacoes || []) {
-        if (timeExceeded) break;
-        await downloadAnexosSequencial(m.anexos || []);
-      }
-
-      const payloadFlat = flattenProcessoParaRow(detalheCompleto);
-      const result = processoEmendaSchema.safeParse(payloadFlat);
-      if (result.success) {
+      if (result) {
         safeProcessos.push(result.data);
-      } else {
-        console.error(`[CRON] Erro de Schema no Processo: ${p.num_formatado} (${p.hash})`);
-      }
-    }
-
-    // 4. Inserção Idempotente (Upsert)
-    // Se o processo já existir no Supabase (pelo hash), atualiza a `situacao_atual`.
-    if (safeProcessos.length > 0) {
-      const { error } = await supabaseAdmin
-        .from("processos_emendas")
-        .upsert(safeProcessos);
-
-      if (error) {
-        throw new Error(`Falha no upsert (Supabase): ${error.message}`);
+        if (result.timeExceeded) {
+          timeExceeded = true;
+        }
       }
     }
 
