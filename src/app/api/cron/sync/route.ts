@@ -9,7 +9,7 @@ import { syncAnexoStorage } from "@/lib/storage-sync";
 // Garante que a requisição seja morta em 10s se travar, e 
 // impede cache estático da rota (force-dynamic).
 // =========================================================================
-export const maxDuration = 10; 
+export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
     console.log(`⏱️ [CRON] Encontrados ${processosParaSincronizar.length} processos pendentes. Sincronizando batch de ${processosLimitados.length}...`);
 
     const cronStartTime = Date.now();
-    const TIMEOUT_MS = 7000;
+    const TIMEOUT_MS = 50000;
     let timeExceeded = false;
     const safeProcessos = [];
 

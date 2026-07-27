@@ -20,7 +20,7 @@ function slugifyFilename(filename: string) {
 export async function syncAnexoStorage(hash: string, urlOriginal: string, filename: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8s de limite por arquivo
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30s de limite por arquivo
 
     const res = await fetch(urlOriginal, {
       headers: { "X-Auth-Hash": process.env.ONEDOC_AUTH_HASH || "" },
