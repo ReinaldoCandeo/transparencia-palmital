@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     const hashes = processos.map((p) => p.hash);
     const { data: dbProcessos } = await supabaseAdmin
       .from("processos_emendas")
-      .select("hash, ultima_sincronizacao")
+      .select("hash, ultima_sincronizacao, anexos, movimentacoes")
       .in("hash", hashes);
 
     const dbMap = new Map(dbProcessos?.map((d) => [d.hash, d]) || []);
@@ -69,10 +69,15 @@ export async function GET(req: NextRequest) {
 
     console.log(`⏱️ [CRON] Encontrados ${processosParaSincronizar.length} processos pendentes. Sincronizando batch de ${processosLimitados.length}...`);
 
+    const cronStartTime = Date.now();
+    const TIMEOUT_MS = 7000;
+    let timeExceeded = false;
     const safeProcessos = [];
 
     // 3. Validação Individual (Zod) - Agora rodando apenas na fila limitada
     for (const p of processosLimitados) {
+      if (timeExceeded) break; // Sai se o tempo geral estourou no processo anterior
+
       // O endpoint de paginação NÃO retorna os dados do formulário de emenda.
       // Precisamos bater no endpoint de detalhes usando o hash para ter o payload completo!
       const detalheCompleto = await obterDetalheInterno(p.hash);
@@ -81,29 +86,56 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      // 3.5 Escopo Cirúrgico de Download (Sincronização Paralela no Storage)
-      const downloadAnexos = async (anexos: any[]) => {
+      // Prepara mapa de URLs existentes para não baixar o que já temos
+      const dbData = dbMap.get(p.hash);
+      const existingUrls = new Map<string, string>();
+      if (dbData) {
+        if (Array.isArray(dbData.anexos)) {
+          dbData.anexos.forEach((a: any) => { if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage) });
+        }
+        if (Array.isArray(dbData.movimentacoes)) {
+          dbData.movimentacoes.forEach((m: any) => {
+            if (Array.isArray(m.anexos)) m.anexos.forEach((a: any) => { if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage) });
+          });
+        }
+      }
+
+      // 3.5 Escopo Cirúrgico de Download (Sincronização Sequencial e Progressiva no Storage)
+      const downloadAnexosSequencial = async (anexos: any[]) => {
         if (!anexos || anexos.length === 0) return;
         
-        const tasks = anexos
-          .filter((a) => a._url_original && !a.url_storage)
-          .map(async (a) => {
-            a.url_storage = await syncAnexoStorage(p.hash, a._url_original, a.arquivo);
-          });
+        for (const a of anexos) {
+          if (!a._url_original) continue;
           
-        if (tasks.length > 0) {
-          await Promise.allSettled(tasks);
+          // Se já baixamos antes (Cache), apenas reaproveita a URL
+          if (existingUrls.has(a.arquivo)) {
+            a.url_storage = existingUrls.get(a.arquivo);
+            continue;
+          }
+
+          if (a.url_storage) continue;
+
+          // Circuit Breaker: Verifica o relógio antes de iniciar um novo download
+          if (Date.now() - cronStartTime > TIMEOUT_MS) {
+            timeExceeded = true;
+            console.warn(`[CRON] Timeout de ${TIMEOUT_MS}ms atingido. Pausando downloads do processo ${p.hash}...`);
+            break;
+          }
+
+          // Baixa um por vez (Evita OOM e Network Congestion)
+          a.url_storage = await syncAnexoStorage(p.hash, a._url_original, a.arquivo);
         }
       };
       
-      // Monta e dispara todas as tarefas de sincronização simultaneamente
-      const syncTasks = [downloadAnexos(detalheCompleto.anexos || [])];
+      // Executa o download sequencial progressivo
+      if (!timeExceeded) {
+        await downloadAnexosSequencial(detalheCompleto.anexos || []);
+      }
       
       for (const m of detalheCompleto.movimentacoes || []) {
-        syncTasks.push(downloadAnexos(m.anexos || []));
+        if (timeExceeded) break;
+        await downloadAnexosSequencial(m.anexos || []);
       }
-
-      await Promise.allSettled(syncTasks);
 
       const payloadFlat = flattenProcessoParaRow(detalheCompleto);
       const result = processoEmendaSchema.safeParse(payloadFlat);
