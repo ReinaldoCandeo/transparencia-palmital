@@ -52,6 +52,19 @@ export async function GET(req: NextRequest) {
       const dbProc = dbMap.get(p.hash);
       if (!dbProc) return true; // Novo processo
       
+      // Verifica se o processo tem arquivos que foram pegos no Circuit Breaker (ainda sem url_storage)
+      let temAnexoPendente = false;
+      if (Array.isArray(dbProc.anexos)) {
+        if (dbProc.anexos.some((a: any) => a.arquivo && !a.url_storage)) temAnexoPendente = true;
+      }
+      if (Array.isArray(dbProc.movimentacoes)) {
+        if (dbProc.movimentacoes.some((m: any) => Array.isArray(m.anexos) && m.anexos.some((a: any) => a.arquivo && !a.url_storage))) {
+          temAnexoPendente = true;
+        }
+      }
+      
+      if (temAnexoPendente) return true; // Força a sincronização se faltam PDFs
+
       const ultimaSinc = dbProc.ultima_sincronizacao
         ? new Date(dbProc.ultima_sincronizacao).getTime()
         : 0;
