@@ -275,7 +275,7 @@ function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
   };
 }
 
-const ASSUNTOS_TERCEIRO_SETOR = new Set([1915739, 1915740]);
+const ASSUNTOS_TERCEIRO_SETOR = new Set([1915739, 1915740, 1915759]);
 
 function isTerceiroSetor(p: OnedocProcesso): boolean {
   // 1. Tenta por ID ou texto do assunto se estiverem perfeitamente classificados
@@ -350,6 +350,37 @@ function extrairEmendaMunicipal(p: OnedocProcesso): EmendaSocialInfo | undefined
   };
 }
 
+function extrairEmendaEsporte(p: OnedocProcesso): EmendaSocialInfo | undefined {
+  if (!p.orgaopedido_1hmg1t1h && !p.paciente_1hpjan1h) return undefined;
+
+  const valorFormatado = formatarMoeda(p.rg_1hvcln1h);
+  const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
+  const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
+
+  let valor_total_calculado = valorFormatado;
+  if (autores.length > 0) {
+    const soma = autores.reduce((acc, a) => acc + parseMoedaToFloat(a.valor), 0);
+    valor_total_calculado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(soma);
+  }
+
+  const numEspelho = stripHtml(p.orgaopedido ?? "");
+  const assuntoProcesso = stripHtml(p.assunto ?? "");
+  const objetoFormatado = numEspelho ? `Espelho Nº ${numEspelho} - ${assuntoProcesso}` : assuntoProcesso;
+
+  return {
+    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
+    ano:               stripHtml(p.divrequisitante ?? ""),
+    objeto:            objetoFormatado,
+    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""), 
+    modalidade:        stripHtml(p.cpf_1hui711h ?? ""),
+    cnpj_concessor:    stripHtml(p.paciente_1hdyef1h ?? ""),
+    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
+    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
+    autores_repasses:  autores,
+    valor_total:       valor_total_calculado,
+  };
+}
+
 function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
   if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
 
@@ -396,7 +427,11 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     destino_setor: p.destino_setor,
     situacao_atual_str: p.situacao_atual_str,
     emenda: processoTerceiroSetor ? undefined : extrairEmenda(p),
-    emenda_social: processoTerceiroSetor ? (p.id_assunto === 1915739 ? extrairEmendaMunicipal(p) : extrairEmendaSocial(p)) : undefined,
+    emenda_social: processoTerceiroSetor ? (
+      p.id_assunto === 1915739 ? extrairEmendaMunicipal(p) :
+      p.id_assunto === 1915759 ? extrairEmendaEsporte(p) :
+      extrairEmendaSocial(p)
+    ) : undefined,
     movimentacoes: (p.movimentacoes ?? [])
       .filter((m) => m.data && m.data !== "0000-00-00")
       .map((m) => ({
@@ -471,6 +506,7 @@ export async function obterProcessosPaginadoInterno(
       1915747, // MAC - Emenda Federal - Saúde
       1915739, // Terceiro Setor - Emenda Municipais - Social
       1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - Social
+      1915759, // Terceiro Setor - Emenda Parlamentar - Esporte
     ]);
 
     const processos = paginaDados.emissoes
