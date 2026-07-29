@@ -7,6 +7,8 @@ import type { ProcessoPublico } from "./onedoc";
  */
 export const processoEmendaSchema = z.object({
   // Campos obrigatórios estruturais
+  id_emissao: z.string().optional(),
+  id_emissao_base: z.string().nullable().optional(),
   hash: z.string().min(1, "Hash é obrigatório para upsert"),
   num: z.string().min(1, "Número é obrigatório"),
   ano: z.string().min(1, "Ano é obrigatório"),

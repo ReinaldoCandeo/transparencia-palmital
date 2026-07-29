@@ -27,6 +27,7 @@ interface OnedocAnexo {
 
 interface OnedocProcesso {
   id_emissao?: string;
+  id_emissao_base?: string;
   num: number;           // número do processo (number na API)
   ano: number;           // ano do processo (number na API)
   num_formatado: string; // ex: "2.504/2026"
@@ -130,6 +131,8 @@ export interface EmendaSocialInfo {
 }
 
 export interface ProcessoPublico {
+  id_emissao: string;
+  id_emissao_base?: string;
   hash: string;
   num: string;
   ano: string;
@@ -277,6 +280,13 @@ function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
 
 const ASSUNTOS_TERCEIRO_SETOR = new Set([1915739, 1915740, 1915759]);
 
+export const ASSUNTOS_EMENDA = new Set([
+  1915747, // MAC - Emenda Federal - Saúde
+  1915739, // Terceiro Setor - Emenda Municipais - Social
+  1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - Social
+  1915759, // Terceiro Setor - Emenda Parlamentar - Esporte
+]);
+
 function isTerceiroSetor(p: OnedocProcesso): boolean {
   // 1. Tenta por ID ou texto do assunto se estiverem perfeitamente classificados
   if (p.id_assunto && ASSUNTOS_TERCEIRO_SETOR.has(Number(p.id_assunto))) return true;
@@ -412,6 +422,8 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
   const processoTerceiroSetor = isTerceiroSetor(p);
 
   return {
+    id_emissao: p.id_emissao || "",
+    id_emissao_base: p.id_emissao_base || undefined,
     hash: p.hash,
     num: String(p.num),
     ano: String(p.ano),
@@ -501,13 +513,6 @@ export async function obterProcessosPaginadoInterno(
     if (!paginaDados || !Array.isArray(paginaDados.emissoes)) {
       return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
     }
-
-    const ASSUNTOS_EMENDA = new Set([
-      1915747, // MAC - Emenda Federal - Saúde
-      1915739, // Terceiro Setor - Emenda Municipais - Social
-      1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - Social
-      1915759, // Terceiro Setor - Emenda Parlamentar - Esporte
-    ]);
 
     const processos = paginaDados.emissoes
       .filter((p) => ASSUNTOS_EMENDA.has(p.id_assunto))

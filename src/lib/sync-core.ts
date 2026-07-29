@@ -1,4 +1,4 @@
-import { obterDetalheInterno } from "@/lib/onedoc";
+import { obterDetalheInterno, ASSUNTOS_EMENDA } from "@/lib/onedoc";
 import { syncAnexoStorage } from "@/lib/storage-sync";
 import { processoEmendaSchema, flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
@@ -24,6 +24,31 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000)
     console.error(`[CORE] Erro ao buscar detalhes na 1Doc. Hash: ${hash}`);
     return null;
   }
+
+  // --- GATEKEEPER (Bypass Dinâmico para Subprocessos) ---
+  let isEmendaOuSubprocesso = false;
+
+  if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto)) {
+    isEmendaOuSubprocesso = true;
+  } else if (detalheCompleto.id_emissao_base) {
+    // É um subprocesso potencial. Vamos checar se o Processo Pai existe no banco.
+    const { data: parentProc } = await supabaseAdmin
+      .from("processos_emendas")
+      .select("id_emissao")
+      .eq("id_emissao", detalheCompleto.id_emissao_base)
+      .single();
+
+    if (parentProc) {
+      console.log(`[CORE] Bypass Autorizado: Processo ${hash} é subprocesso do Pai ${detalheCompleto.id_emissao_base}`);
+      isEmendaOuSubprocesso = true;
+    }
+  }
+
+  if (!isEmendaOuSubprocesso) {
+    console.log(`[CORE] Processo ${hash} rejeitado: Não é Emenda nem Subprocesso válido.`);
+    return null;
+  }
+  // ------------------------------------------------------
 
   // 2. Traz estado atual no DB para comparar o que já temos em anexo
   const { data: dbData } = await supabaseAdmin
