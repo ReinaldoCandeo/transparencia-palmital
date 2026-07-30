@@ -24,17 +24,33 @@ function formatDateBR(dataStr: string | null | undefined) {
   return `${dia}/${mes}/${ano}`;
 }
 
+/** Palavras que indicam que o último segmento do assunto NÃO é um nome de autor */
+const ASSUNTO_NAO_AUTOR = ["CUSTEIO", "EMENDA", "SETOR", "REPASSE", "MUN", "FED", "INVEST", "CAPITAL"];
+
+function normalizeStr(s: string) {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u00BA/g, "o").toLowerCase().trim();
+}
+
 function getAutorEmenda(p: ProcessoEmendaRow) {
-  if (p.social_autores_repasses && p.social_autores_repasses.length > 0) {
-    return p.social_autores_repasses.map((a: any) => a.nome).join(", ");
+  if (p.form_data && Array.isArray(p.form_data)) {
+    // Busca EXPLÍCITA: apenas labels de autor parlamentar/vereador
+    const autores = (p.form_data as any[])
+      .filter((f: any) => {
+        const norm = normalizeStr(f.label || "");
+        return norm.includes("vereador autor") || norm.includes("parlamentar autor");
+      })
+      .map((f: any) => f.valor as string)
+      .filter(Boolean);
+
+    if (autores.length > 0) return autores.join(", ");
   }
 
-  // Tenta extrair o nome do autor do final do campo "Assunto", que segue o padrão:
-  // "MAC - EMENDA FED - 39380003 - CEZINHA DE MADUREIRA"
-  if (p.assunto && p.assunto.includes("-")) {
-    const parts = p.assunto.split("-");
-    const autor = parts[parts.length - 1].trim();
-    if (autor) return autor;
+  // Fallback: última parte do assunto separado por " - ", mas só se parece um nome
+  if (p.assunto && p.assunto.includes(" - ")) {
+    const parts = p.assunto.split(" - ");
+    const last = parts[parts.length - 1].trim();
+    const ehNome = last.length > 3 && !ASSUNTO_NAO_AUTOR.some((w) => last.toUpperCase().includes(w));
+    if (ehNome) return last;
   }
 
   return "Não identificado";
