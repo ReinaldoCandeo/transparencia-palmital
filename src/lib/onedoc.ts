@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-
+import { z } from "zod";
 // ─── Interfaces do payload bruto da 1Doc ──────────────────────────────────
 
 interface OnedocMovimentacao {
@@ -25,44 +25,44 @@ interface OnedocAnexo {
   url_original: string; // idem
 }
 
-interface OnedocProcesso {
-  id_emissao?: string;
-  id_emissao_base?: string;
-  num: number;           // número do processo (number na API)
-  ano: number;           // ano do processo (number na API)
-  num_formatado: string; // ex: "2.504/2026"
-  assunto: string;
-  conteudo: string;
-  resumo?: string;
-  data: string;
-  hora: string;
-  origem_id_setor: string;
-  origem_setor: string;
-  origem_usuario: string;
-  destino_id_setor: string;
-  destino_setor: string;
-  situacao_atual_str: string;
-  hash: string;
-  id_assunto: number;    // presente na listagem — usado para filtragem pós-fetch
-  total_despachos?: string;
-  movimentacoes?: OnedocMovimentacao[];
-  anexos?: OnedocAnexo[];
-  // ── Campos do Formulário de Emenda Parlamentar (nomes obfuscados pela 1Doc) ──
-  // Mapeamento confirmado via diagnóstico em 2026-07-15
-  orgaopedido?: string;           // ORIGEM: '["Federal"]'
-  orgaopedido_1hmg1t1h?: string;  // Nº LEI / PORTARIA: "10.436"
-  divrequisitante?: string;       // FUNÇÃO LEGISLATIVA: '["Deputado"]'
-  paciente_1hpjan1h?: string;     // Nº EMENDA / DEMANDA
-  "4_1ha5rk1h"?: string;         // Nº PROPOSTA
-  rg_1hvcln1h?: string;           // TIPO: '["Custeio"]'
-  paciente_1hdyef1h?: string;     // BLOCO: '["302 - Média e Alta Complexidade"]'
-  responsave_1hl4nm1h?: string;   // VALOR DISPONIBILIZADO: "100000.00"
-  rg_1h5hxq1h?: string;           // EXERCÍCIO: "31/12/2026"
-  cpf_1hui711h?: string;          // DADOS BANCÁRIOS (nome do banco)
-  // 🚫 CAMPOS SENSÍVEIS — nunca incluir na saída pública (LGPD + Segurança)
-  agencia_1hh0po1h?: string;      // AGÊNCIA — BLOQUEADO
-  n_conta__1hmzl11h?: string;     // Nº CONTA — BLOQUEADO
-}
+export const OnedocProcessoSchema = z.object({
+  id_emissao: z.string().optional(),
+  id_emissao_base: z.string().optional(),
+  num: z.coerce.number(),
+  ano: z.coerce.number(),
+  num_formatado: z.string().optional(),
+  assunto: z.string().optional(),
+  conteudo: z.string().optional(),
+  resumo: z.string().optional(),
+  data: z.string().optional(),
+  hora: z.string().optional(),
+  origem_id_setor: z.string().optional(),
+  origem_setor: z.string().optional(),
+  origem_usuario: z.string().optional(),
+  destino_id_setor: z.string().optional(),
+  destino_setor: z.string().optional(),
+  situacao_atual_str: z.string().optional(),
+  hash: z.string(),
+  id_assunto: z.coerce.number(), // ✅ Coerção na fronteira!
+  total_despachos: z.coerce.number().optional(),
+  movimentacoes: z.array(z.any()).optional(),
+  anexos: z.array(z.any()).optional(),
+  // Campos do Formulário
+  orgaopedido: z.string().nullable().optional(),
+  orgaopedido_1hmg1t1h: z.string().nullable().optional(),
+  divrequisitante: z.string().nullable().optional(),
+  paciente_1hpjan1h: z.string().nullable().optional(),
+  "4_1ha5rk1h": z.string().nullable().optional(),
+  rg_1hvcln1h: z.string().nullable().optional(),
+  paciente_1hdyef1h: z.string().nullable().optional(),
+  responsave_1hl4nm1h: z.string().nullable().optional(),
+  rg_1h5hxq1h: z.string().nullable().optional(),
+  cpf_1hui711h: z.string().nullable().optional(),
+  agencia_1hh0po1h: z.string().nullable().optional(),
+  n_conta__1hmzl11h: z.string().nullable().optional(),
+}).passthrough();
+
+export type OnedocProcesso = z.infer<typeof OnedocProcessoSchema>;
 
 interface OnedocPagina {
   num_pagina: number;
@@ -95,41 +95,6 @@ export interface AnexoPublico {
   _url_original?: string; // Temporário durante o sync, não usar no frontend!
 }
 
-/** Dados públicos da emenda parlamentar (agência e nº conta OMITIDOS por segurança) */
-export interface EmendaInfo {
-  origem: string;              // "Federal" | "Estadual" | "Municipal"
-  lei_portaria: string;        // "10.436"
-  funcao_legislativa: string;  // "Deputado" | "Senador" | ...
-  num_emenda: string;          // "39380003"
-  num_proposta: string;        // "36000758410202600"
-  tipo: string;                // "Custeio" | "Investimento"
-  bloco: string;               // "302 - Média e Alta Complexidade"
-  valor_disponibilizado: string; // "R$ 100.000,00" (formatado)
-  valor_raw: string;           // "100000.00" (para cálculos)
-  exercicio: string;           // "31/12/2026"
-  banco: string;               // "CAIXA ECONOMICA FEDERAL"
-  justificativa: string;       // Texto limpo do campo conteudo (sem HTML, sem assinatura)
-}
-
-export interface EmendaSocialInfo {
-  num_emenda:        string;  // orgaopedido_1hmg1t1h → "14/2025"
-  ano:               string;  // orgaopedido           → "2025"
-  objeto:            string;  // divrequisitante        → "Repasse de recursos p/ TEA..."
-  origem:            string;  // 4_1ha5rk1h            → "Municipal"
-  modalidade:        string;  // rg_1hvcln1h           → "Emenda Individual Impositiva"
-  cnpj_concessor:    string;  // cpf_1hui711h           → "44.543.981/0001-99"
-  cnpj_beneficiaria: string;  // rg_1h5hxq1h           → "49.893.795/0001-01"
-  razao_social:      string;  // responsave_1hl4nm1h   → "ASSOC DE PAIS E AMIGOS..."
-  
-  // Feature Preventiva: Preparado para múltiplos autores e soma
-  autores_repasses: {
-    num_emenda?: string;
-    nome: string;
-    valor: string;
-  }[];
-  valor_total: string;
-}
-
 export interface ProcessoPublico {
   id_emissao: string;
   id_emissao_base?: string;
@@ -146,8 +111,10 @@ export interface ProcessoPublico {
   situacao_atual_str: string;
   movimentacoes: MovimentacaoPublica[];
   anexos: AnexoPublico[];
-  emenda?: EmendaInfo;          // Saúde (1915747) — mantida intacta
-  emenda_social?: EmendaSocialInfo; // Social (1915739, 1915740)
+  
+  // JSONB flexível para formulários
+  form_data: { label: string; valor: string; tipo?: string }[];
+  conteudo?: string;
 }
 
 // ─── Configuração ──────────────────────────────────────────────────────────
@@ -189,8 +156,20 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+/**
+ * Remove apenas o bloco de assinatura interna para LGPD, 
+ * mas mantém a formatação HTML para exibição na UI.
+ */
+function cleanHtml(html: string): string {
+  if (!html) return "";
+  return html.replace(
+    /<div[^>]*class=["'][^"']*emissao_assinatura[^"']*["'][^>]*>[\s\S]*?<\/div>/gi,
+    ""
+  ).trim();
+}
+
 /** Deserializa campos select da 1Doc: '["Federal"]' → "Federal" */
-function parseSelect(valor: string | undefined): string {
+function parseSelect(valor: string | null | undefined): string {
   if (!valor) return "";
   try {
     const arr = JSON.parse(valor);
@@ -205,7 +184,7 @@ function parseSelect(valor: string | undefined): string {
  * A 1Doc salva campos 'decimal' no formato brasileiro: "100.000,00"
  * (ponto = milhar, vírgula = decimal). parseFloat nativo não entende isso.
  */
-function formatarMoeda(valor: string | undefined): string {
+function formatarMoeda(valor: string | null | undefined): string {
   if (!valor) return "";
   const str = String(valor).trim();
   // Detecta formato brasileiro: "100.000,00" ou "1.000,00" ou "500,00"
@@ -226,11 +205,11 @@ function formatarMoeda(valor: string | undefined): string {
  * Higienização estrita de string de moeda BRL para Float.
  * Remove 'R$', espaços, pontos de milhar e converte vírgula decimal para ponto.
  */
-function parseMoedaToFloat(valor: string | undefined): number {
+function parseMoedaToFloat(valor: string | null | undefined): number {
   if (!valor) return 0;
   const limpo = valor
     .replace(/R\$/g, "")
-    .replace(/\s/g, "")
+    .replace(/[\s\u00A0\u202F]/g, "")
     .replace(/\./g, "")
     .replace(/,/g, ".");
   const floatVal = parseFloat(limpo);
@@ -240,7 +219,7 @@ function parseMoedaToFloat(valor: string | undefined): number {
 /** Converte data ISO ("2026-12-31") para formato brasileiro ("31/12/2026").
  * Se já estiver em DD/MM/AAAA, retorna como está.
  */
-function formatarDataBR(valor: string | undefined): string {
+function formatarDataBR(valor: string | null | undefined): string {
   if (!valor) return "";
   // ISO: AAAA-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
@@ -251,34 +230,50 @@ function formatarDataBR(valor: string | undefined): string {
 }
 
 /**
- * Extrai e sanitiza os dados do Formulário de Emenda Parlamentar.
- * Bloqueia explicitamente agência e nº de conta (dados bancários sensíveis).
+ * Extrai dinamicamente todos os dados de formulário definidos pela 1Doc
+ * a partir de emissao_campos_adicionais_assunto.
  */
-function extrairEmenda(p: OnedocProcesso): EmendaInfo | undefined {
-  // Só extrai se for um processo de emenda parlamentar
-  if (!p.orgaopedido && !p.paciente_1hpjan1h) return undefined;
+function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tipo?: string }[] {
+  const camposAdicionaisStr = (p as any).emissao_campos_adicionais_assunto;
+  if (!camposAdicionaisStr) return [];
+  
+  try {
+    const camposDefinidos = JSON.parse(camposAdicionaisStr);
+    const formData = [];
+    
+    for (const def of camposDefinidos) {
+      if (!def.campo || !def.label) continue;
+      
+      const labelStr = stripHtml(def.label);
+      if (!labelStr) continue; // Pula labels vazias
+      
+      const valorCru = (p as any)[def.campo];
+      if (valorCru === undefined || valorCru === null || valorCru === "") continue;
 
-  const valorRaw = p.responsave_1hl4nm1h ?? "";
+      let valorFormatado = stripHtml(valorCru);
+      
+      // Formatação baseada no tipo ou conteúdo
+      if (def.tipo === "text" && valorFormatado.match(/^\d{1,3}(\.\d{3})*,\d{2}$/)) {
+        valorFormatado = formatarMoeda(valorFormatado);
+      }
 
-  return {
-    origem: parseSelect(p.orgaopedido),
-    lei_portaria: p.orgaopedido_1hmg1t1h ?? "",
-    funcao_legislativa: parseSelect(p.divrequisitante),
-    num_emenda: p.paciente_1hpjan1h ?? "",
-    num_proposta: p["4_1ha5rk1h"] ?? "",
-    tipo: parseSelect(p.rg_1hvcln1h),
-    bloco: parseSelect(p.paciente_1hdyef1h),
-    valor_disponibilizado: formatarMoeda(valorRaw),
-    valor_raw: valorRaw,
-    exercicio: formatarDataBR(p.rg_1h5hxq1h),
-    banco: p.cpf_1hui711h ?? "",
-    // ✅ Justificativa: conteudo limpo de HTML e assinatura interna
-    justificativa: stripHtml(p.conteudo ?? ""),
-    // 🚫 agencia_1hh0po1h e n_conta__1hmzl11h: NUNCA incluídos aqui
-  };
+      // Ocultar dados bancários estritos na extração
+      const labelLower = labelStr.toLowerCase();
+      if (labelLower.includes("agência") || labelLower.includes("conta")) {
+        valorFormatado = "*** OCULTADO (LGPD) ***";
+      }
+
+      formData.push({
+        label: labelStr,
+        valor: valorFormatado,
+        tipo: def.tipo
+      });
+    }
+    return formData;
+  } catch (err) {
+    return [];
+  }
 }
-
-const ASSUNTOS_TERCEIRO_SETOR = new Set([1915739, 1915740, 1915759]);
 
 export const ASSUNTOS_EMENDA = new Set([
   1915747, // MAC - Emenda Federal - Saúde
@@ -287,140 +282,7 @@ export const ASSUNTOS_EMENDA = new Set([
   1915759, // Terceiro Setor - Emenda Parlamentar - Esporte
 ]);
 
-function isTerceiroSetor(p: OnedocProcesso): boolean {
-  // 1. Tenta por ID ou texto do assunto se estiverem perfeitamente classificados
-  if (p.id_assunto && ASSUNTOS_TERCEIRO_SETOR.has(Number(p.id_assunto))) return true;
-  if (p.assunto && p.assunto.toLowerCase().includes("terceiro setor")) return true;
-
-  // 2. Heurística de Conteúdo (Solução Arquitetural Padrão para API /despachos)
-  // O campo 'rg_1h5hxq1h' armazena o "Exercício" (Saúde, ~4 dígitos) ou "CNPJ Beneficiária" (Terceiro Setor)
-  const rgValue = stripHtml(p.rg_1h5hxq1h ?? "").trim();
-  if (rgValue.length > 10 && rgValue.includes("/")) {
-    return true; // Contém barra e tem tamanho compatível com CNPJ
-  }
-
-  // O campo 'cpf_1hui711h' armazena "Banco" (Saúde, Texto) ou "CNPJ Concessor" (Terceiro Setor)
-  const cpfValue = stripHtml(p.cpf_1hui711h ?? "").trim();
-  if (cpfValue.length > 10 && /^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$/.test(cpfValue)) {
-    return true; // Match exato com regex de CNPJ formatado
-  }
-
-  return false;
-}
-
-function extrairAutoresRegex(p: OnedocProcesso, autorPrincipalNome: string, valorFormatado: string) {
-  const autores: EmendaSocialInfo["autores_repasses"] = [];
-  if (autorPrincipalNome) {
-    autores.push({ nome: autorPrincipalNome, valor: valorFormatado });
-  }
-
-  if (p.conteudo) {
-    const textoConteudo = stripHtml(p.conteudo);
-    const regexAutoresExtra = /N[º°o]?\s*da\s*Emenda:\s*(?<numEmenda>[^;]+?)\s*;\s*Vereador\s*Autor:\s*(?<nome>[^;]+?)\s*;\s*Valor:\s*(?<valor>[\d\.,]+)/gi;
-    let match;
-    while ((match = regexAutoresExtra.exec(textoConteudo)) !== null) {
-      if (!match.groups) continue;
-      
-      const numEmendaExtra = match.groups.numEmenda.trim();
-      const nomeAutorExtra = match.groups.nome.trim();
-      const valorAutorExtra = formatarMoeda(match.groups.valor.trim());
-      
-      if (nomeAutorExtra && valorAutorExtra && nomeAutorExtra.toLowerCase() !== autorPrincipalNome.toLowerCase()) {
-        autores.push({ num_emenda: numEmendaExtra, nome: nomeAutorExtra, valor: valorAutorExtra });
-      }
-    }
-  }
-  return autores;
-}
-
-function extrairEmendaMunicipal(p: OnedocProcesso): EmendaSocialInfo | undefined {
-  if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
-
-  const valorFormatado = formatarMoeda(p.paciente_1hdyef1h);
-  const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
-  const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
-
-  let valor_total_calculado = valorFormatado;
-  if (autores.length > 0) {
-    const soma = autores.reduce((acc, a) => acc + parseMoedaToFloat(a.valor), 0);
-    valor_total_calculado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(soma);
-  }
-
-  return {
-    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
-    ano:               stripHtml(p.orgaopedido ?? ""), // orgaopedido = Ano no Municipal
-    objeto:            stripHtml(p.divrequisitante ?? ""),
-    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""), // 4_1ha5rk1h = Origem no Municipal
-    modalidade:        stripHtml(p.rg_1hvcln1h ?? ""),
-    cnpj_concessor:    stripHtml(p.cpf_1hui711h ?? ""),
-    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
-    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
-    autores_repasses:  autores,
-    valor_total:       valor_total_calculado,
-  };
-}
-
-function extrairEmendaEsporte(p: OnedocProcesso): EmendaSocialInfo | undefined {
-  if (!p.orgaopedido_1hmg1t1h && !p.paciente_1hpjan1h) return undefined;
-
-  const valorFormatado = formatarMoeda(p.rg_1hvcln1h);
-  const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
-  const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
-
-  let valor_total_calculado = valorFormatado;
-  if (autores.length > 0) {
-    const soma = autores.reduce((acc, a) => acc + parseMoedaToFloat(a.valor), 0);
-    valor_total_calculado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(soma);
-  }
-
-  const numEspelho = stripHtml(p.orgaopedido ?? "");
-  const assuntoProcesso = stripHtml(p.assunto ?? "");
-  const objetoFormatado = numEspelho ? `Espelho Nº ${numEspelho} - ${assuntoProcesso}` : assuntoProcesso;
-
-  return {
-    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
-    ano:               stripHtml(p.divrequisitante ?? ""),
-    objeto:            objetoFormatado,
-    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""), 
-    modalidade:        stripHtml(p.cpf_1hui711h ?? ""),
-    cnpj_concessor:    stripHtml(p.paciente_1hdyef1h ?? ""),
-    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
-    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
-    autores_repasses:  autores,
-    valor_total:       valor_total_calculado,
-  };
-}
-
-function extrairEmendaSocial(p: OnedocProcesso): EmendaSocialInfo | undefined {
-  if (!p.responsave_1hl4nm1h && !p.paciente_1hpjan1h) return undefined;
-
-  const valorFormatado = formatarMoeda(p.paciente_1hdyef1h);
-  const autorPrincipalNome = stripHtml(p.paciente_1hpjan1h ?? "").trim();
-  const autores = extrairAutoresRegex(p, autorPrincipalNome, valorFormatado);
-
-  let valor_total_calculado = valorFormatado;
-  if (autores.length > 0) {
-    const soma = autores.reduce((acc, a) => acc + parseMoedaToFloat(a.valor), 0);
-    valor_total_calculado = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(soma);
-  }
-
-  return {
-    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
-    ano:               "", // Não temos o mapeamento do ano no Social ainda
-    objeto:            stripHtml(p.divrequisitante ?? ""),
-    origem:            stripHtml(p.orgaopedido ?? ""),  // orgaopedido = Origem no Social
-    modalidade:        stripHtml(p.rg_1hvcln1h ?? ""),
-    cnpj_concessor:    stripHtml(p.cpf_1hui711h ?? ""),
-    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
-    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
-    autores_repasses:  autores,
-    valor_total:       valor_total_calculado,
-  };
-}
-
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
-  const processoTerceiroSetor = isTerceiroSetor(p);
-
   return {
     id_emissao: p.id_emissao || "",
     id_emissao_base: p.id_emissao_base || undefined,
@@ -430,20 +292,19 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     // Bug da 1Doc: o endpoint /despachos retorna num_formatado vazio.
     // Fallback: constrói o formato brasileiro a partir de num + ano.
     // Ex: num=2663, ano=2026 → "2.663/2026"
-    num_formatado: p.num_formatado || `${Number(p.num).toLocaleString("pt-BR")}/${p.ano}`,
+    num_formatado: p.num_formatado || `${p.num.toLocaleString("pt-BR")}/${p.ano}`,
     id_assunto: p.id_assunto,
     assunto: stripHtml(p.assunto ?? ""),
-    data: p.data,
-    hora: p.hora,
-    origem_setor: p.origem_setor,
-    destino_setor: p.destino_setor,
-    situacao_atual_str: p.situacao_atual_str,
-    emenda: processoTerceiroSetor ? undefined : extrairEmenda(p),
-    emenda_social: processoTerceiroSetor ? (
-      p.id_assunto === 1915739 ? extrairEmendaMunicipal(p) :
-      p.id_assunto === 1915759 ? extrairEmendaEsporte(p) :
-      extrairEmendaSocial(p)
-    ) : undefined,
+    conteudo: p.conteudo ? cleanHtml(p.conteudo) : undefined,
+    data: p.data ?? "",
+    hora: p.hora ?? "",
+    origem_setor: p.origem_setor ?? "",
+    destino_setor: p.destino_setor ?? "",
+    situacao_atual_str: p.situacao_atual_str ?? "",
+    
+    // Novo fluxo universal de formulário
+    form_data: extrairFormData(p),
+
     movimentacoes: (p.movimentacoes ?? [])
       .filter((m) => m.data && m.data !== "0000-00-00")
       .map((m) => ({
@@ -452,7 +313,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
         data: m.data,
         hora: m.hora,
         origem_setor: m.origem_setor ?? "",
-        anexos: (m.anexos ?? []).map((a) => {
+        anexos: (m.anexos ?? []).map((a: any) => {
           const partes = a.arquivo.split(".");
           const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
           return {
@@ -514,7 +375,10 @@ export async function obterProcessosPaginadoInterno(
       return { processos: [], paginaAtual: pagina, totalPaginas: 1 };
     }
 
-    const processos = paginaDados.emissoes
+    // Boundary Validation
+    const emissoesValidadas = z.array(OnedocProcessoSchema).parse(paginaDados.emissoes);
+
+    const processos = emissoesValidadas
       .filter((p) => ASSUNTOS_EMENDA.has(p.id_assunto))
       .map(sanitizarProcesso);
     // A API retorna 20 itens por página (corrigido de 15)
@@ -529,7 +393,7 @@ export async function obterProcessosPaginadoInterno(
 
 // ─── Busca Exata por Número e Ano (Proxy Direct Search) ───────────────────
 
-async function obterHashPorNumeroInterno(
+export async function obterHashPorNumeroInterno(
   numero: string,
   ano: string
 ): Promise<string | null> {
@@ -595,7 +459,10 @@ export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico
     // Logs de diagnóstico removidos (LGPD / Segurança)
     // ────────────────────────────────────────────────────────────────────────
 
-    return sanitizarProcesso(processo);
+    // Boundary Validation
+    const processoSanitizado = OnedocProcessoSchema.parse(processo);
+
+    return sanitizarProcesso(processoSanitizado);
   } catch (err) {
     console.error(`[1Doc] Falha ao buscar detalhe ${hash}:`, err);
     return null;

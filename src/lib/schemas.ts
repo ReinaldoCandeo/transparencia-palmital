@@ -23,38 +23,14 @@ export const processoEmendaSchema = z.object({
   destino_setor: z.string().nullable().optional(),
   situacao_atual: z.string().nullable().optional(),
   ultima_sincronizacao: z.string().optional(),
+  conteudo: z.string().nullable().optional(),
 
-  // EmendaInfo (Saúde) - 1915747
-  emenda_origem: z.string().nullable().optional(),
-  emenda_lei_portaria: z.string().nullable().optional(),
-  emenda_funcao_legislativa: z.string().nullable().optional(),
-  emenda_num_emenda: z.string().nullable().optional(),
-  emenda_num_proposta: z.string().nullable().optional(),
-  emenda_tipo: z.string().nullable().optional(),
-  emenda_bloco: z.string().nullable().optional(),
-  emenda_valor_raw: z.string().nullable().optional(),
-  emenda_valor_formatado: z.string().nullable().optional(),
-  emenda_exercicio: z.string().nullable().optional(),
-  emenda_banco: z.string().nullable().optional(),
-  emenda_justificativa: z.string().nullable().optional(),
-
-  // EmendaSocialInfo (Social) - 1915739, 1915740
-  social_num_emenda: z.string().nullable().optional(),
-  social_ano: z.string().nullable().optional(),
-  social_objeto: z.string().nullable().optional(),
-  social_origem: z.string().nullable().optional(),
-  social_modalidade: z.string().nullable().optional(),
-  social_cnpj_concessor: z.string().nullable().optional(),
-  social_cnpj_beneficiaria: z.string().nullable().optional(),
-  social_razao_social: z.string().nullable().optional(),
-  social_valor_total: z.string().nullable().optional(),
-  
-  // --- BLOCOS COMPLEXOS (Fallback Inteligente com Tipagem Estrita) ---
-  social_autores_repasses: z.array(
+  // Dados dinâmicos extraídos dos formulários da 1Doc
+  form_data: z.array(
     z.object({
-      num_emenda: z.string().optional(),
-      nome: z.string(),
+      label: z.string(),
       valor: z.string(),
+      tipo: z.string().optional()
     })
   ).nullable().default([]),
 
@@ -100,40 +76,19 @@ export type ProcessoEmendaRow = z.infer<typeof processoEmendaSchema>;
 export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
   const row: ProcessoEmendaRow = {
     ...p,
-    // Achata campos de emenda de Saúde
-    emenda_origem: p.emenda?.origem ?? null,
-    emenda_lei_portaria: p.emenda?.lei_portaria ?? null,
-    emenda_funcao_legislativa: p.emenda?.funcao_legislativa ?? null,
-    emenda_num_emenda: p.emenda?.num_emenda ?? null,
-    emenda_num_proposta: p.emenda?.num_proposta ?? null,
-    emenda_tipo: p.emenda?.tipo ?? null,
-    emenda_bloco: p.emenda?.bloco ?? null,
-    emenda_valor_raw: p.emenda?.valor_raw ?? null,
-    emenda_valor_formatado: p.emenda?.valor_disponibilizado ?? null,
-    emenda_exercicio: p.emenda?.exercicio ?? null,
-    emenda_banco: p.emenda?.banco ?? null,
-    emenda_justificativa: p.emenda?.justificativa ?? null,
-
-    // Achata campos de emenda Social
-    social_num_emenda: p.emenda_social?.num_emenda ?? null,
-    social_ano: p.emenda_social?.ano ?? null,
-    social_objeto: p.emenda_social?.objeto ?? null,
-    social_origem: p.emenda_social?.origem ?? null,
-    social_modalidade: p.emenda_social?.modalidade ?? null,
-    social_cnpj_concessor: p.emenda_social?.cnpj_concessor ?? null,
-    social_cnpj_beneficiaria: p.emenda_social?.cnpj_beneficiaria ?? null,
-    social_razao_social: p.emenda_social?.razao_social ?? null,
-    social_valor_total: p.emenda_social?.valor_total ?? null,
-    social_autores_repasses: p.emenda_social?.autores_repasses ?? [],
+    // Metadados flexíveis da UI baseada em JSONB
+    form_data: p.form_data || [],
     
     destino_setor: p.destino_setor,
     situacao_atual: p.situacao_atual_str,
     ultima_sincronizacao: new Date().toISOString(),
+    conteudo: p.conteudo,
   };
 
-  // Remove os objetos aninhados originais para evitar erro PGRST204 no Supabase
-  // pois essas colunas não existem na tabela SQL.
-  const { emenda, emenda_social, situacao_atual_str, ...rowLimpa } = row as any;
+  // Remove os objetos originais do processo público que não vão pro banco
+  const { situacao_atual_str, form_data: _form, ...rowLimpa } = row as any;
+  // Readiciona form_data garantido
+  rowLimpa.form_data = row.form_data;
   
   return rowLimpa as ProcessoEmendaRow;
 }

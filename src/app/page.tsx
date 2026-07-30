@@ -18,6 +18,7 @@ export default async function PaginaBuscaProcessos({
   const { data: processos, error } = await supabase
     .from("processos_emendas")
     .select("*")
+    .is("id_emissao_base", null)
     .order("data", { ascending: false })
     .order("hora", { ascending: false });
 

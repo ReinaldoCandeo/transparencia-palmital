@@ -21,10 +21,10 @@ import {
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { supabase } from "@/lib/db-client";
-import type { EmendaInfo, EmendaSocialInfo } from "@/lib/onedoc";
 import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 import { after } from "next/server";
-import { obterDetalheInterno } from "@/lib/onedoc";
+import { EmendaSaudeBlock, EmendaTerceiroSetorBlock, EmendaMunicipalBlock } from "@/components/portal/EmendaBlocks";
+import { syncProcessByHash } from "@/lib/sync-core";
 import { flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
 
@@ -65,167 +65,33 @@ function InfoField({
   );
 }
 
-function EmendaBlock({ emenda }: { emenda: EmendaInfo }) {
-  return (
-    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 shadow-sm dark:border-emerald-800/40 dark:bg-emerald-950/20 sm:p-8">
-      {/* Cabeçalho */}
-      <div className="flex items-center gap-3 border-b border-emerald-200/70 pb-4 dark:border-emerald-800/40">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
-          <Landmark className="h-5 w-5" />
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-emerald-900 dark:text-emerald-100">
-            Emenda Parlamentar — Informações Públicas
-          </h3>
-          <p className="text-xs text-emerald-700/80 dark:text-emerald-400">
-            Dados do Formulário de Controle Interno de Emendas — Saúde
-          </p>
-        </div>
-      </div>
 
-      {/* Destaque do Valor */}
-      {emenda.valor_disponibilizado && (
-        <div className="mt-5 flex flex-col items-center justify-center rounded-xl bg-emerald-600 py-5 text-white shadow-inner sm:flex-row sm:gap-4">
-          <Banknote className="h-7 w-7 opacity-80" />
-          <div className="text-center sm:text-left">
-            <p className="text-xs font-medium uppercase tracking-widest opacity-80">
-              Valor Disponibilizado
-            </p>
-            <p className="text-3xl font-bold tracking-tight">
-              {emenda.valor_disponibilizado}
-            </p>
-          </div>
-        </div>
-      )}
 
-      {/* Grid de campos */}
-      <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
-        <InfoField icon={Building} label="Origem" value={emenda.origem} />
-        <InfoField icon={Gavel} label="Função Legislativa" value={emenda.funcao_legislativa} />
-        <InfoField icon={Hash} label="Nº da Emenda" value={emenda.num_emenda} />
-        <InfoField icon={ScrollText} label="Lei / Portaria" value={emenda.lei_portaria} />
-        <InfoField icon={Tag} label="Tipo" value={emenda.tipo} />
-        <InfoField icon={LayoutGrid} label="Bloco" value={emenda.bloco} />
-        <InfoField icon={CalendarClock} label="Exercício" value={emenda.exercicio} />
-        <InfoField
-          icon={CreditCard}
-          label="Banco Conveniado"
-          value={emenda.banco}
-          className="col-span-2 sm:col-span-2"
-        />
-        {emenda.num_proposta && (
-          <InfoField
-            icon={FileText}
-            label="Nº Proposta"
-            value={emenda.num_proposta}
-            className="col-span-2 sm:col-span-3"
-          />
-        )}
-      </dl>
+function SubprocessosBlock({ subprocessos }: { subprocessos: any[] }) {
+  if (!subprocessos || subprocessos.length === 0) return null;
 
-      {/* Aviso de dados bancários */}
-      <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-emerald-300/60 bg-emerald-100/60 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-700/40 dark:bg-emerald-900/30 dark:text-emerald-300">
-        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>
-          <strong>Dados bancários protegidos:</strong> O número da agência e da
-          conta corrente são omitidos neste portal por proteção de
-          infraestrutura pública, em conformidade com as boas práticas de
-          segurança da informação e LGPD.
-        </span>
-      </div>
-
-      {/* Justificativa */}
-      {emenda.justificativa && (
-        <div className="mt-6">
-          <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-900 dark:text-emerald-200">
-            <ScrollText className="h-4 w-4" />
-            Justificativa da Emenda
-          </h4>
-          <p className="rounded-lg border border-emerald-200/60 bg-white/70 px-4 py-3 text-sm leading-relaxed text-foreground dark:border-emerald-800/30 dark:bg-black/20">
-            {emenda.justificativa}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EmendaSocialBlock({ emenda }: { emenda: EmendaSocialInfo }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-          <Landmark className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
-            Terceiro Setor Social
-          </h2>
-          <p className="text-sm font-medium text-blue-700/80 dark:text-blue-300/80">
-            {emenda.modalidade} • Lei/Portaria {emenda.num_emenda}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2 md:grid-cols-3">
-        <div>
-          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <Tag className="h-3.5 w-3.5" /> Entidade Beneficiária
-          </dt>
-          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
-            {emenda.razao_social}
-            <div className="text-xs mt-0.5 text-blue-700/60 dark:text-blue-300/60">
-              CNPJ: {emenda.cnpj_beneficiaria}
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground mb-4">
+        <LayoutGrid className="h-5 w-5 text-muted-foreground" /> Processos Vinculados (Subprocessos)
+      </h3>
+      <div className="grid gap-3">
+        {subprocessos.map((sub: any, i: number) => (
+          <div key={i} className="flex flex-col rounded-lg border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-mono text-sm font-bold text-foreground">
+                Autuação nº {sub.num_formatado || `${sub.num}/${sub.ano}`}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{sub.assunto}</p>
             </div>
-          </dd>
-        </div>
-
-        <div>
-          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <Building className="h-3.5 w-3.5" /> Órgão Concessor
-          </dt>
-          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
-            Prefeitura Municipal de Palmital
-            <div className="text-xs mt-0.5 text-blue-700/60 dark:text-blue-300/60">
-              CNPJ: {emenda.cnpj_concessor}
-            </div>
-          </dd>
-        </div>
-
-        <div>
-          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <Banknote className="h-3.5 w-3.5" /> Valor do Repasse (Total)
-          </dt>
-          <dd className="mt-1.5 text-base font-bold text-blue-900 dark:text-blue-100">
-            {emenda.valor_total || (emenda as any).valor}
-          </dd>
-        </div>
-
-        <div className="sm:col-span-2">
-          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <Gavel className="h-3.5 w-3.5" /> Autores dos Repasses
-          </dt>
-          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
-            <ul className="space-y-1">
-              {(emenda.autores_repasses || []).map((autor: any, idx: number) => (
-                <li key={idx} className="flex items-center gap-2">
-                  <span className="font-semibold">{autor.nome}</span>
-                  <span className="text-blue-700/60 dark:text-blue-300/60">—</span>
-                  <span>{autor.valor}</span>
-                </li>
-              ))}
-            </ul>
-          </dd>
-        </div>
-
-        <div className="sm:col-span-2">
-          <dt className="flex items-center gap-2 text-xs font-semibold text-blue-800/70 dark:text-blue-300/70">
-            <ScrollText className="h-3.5 w-3.5" /> Objeto da Parceria
-          </dt>
-          <dd className="mt-1.5 text-sm font-medium text-blue-950 dark:text-blue-50">
-            {emenda.objeto}
-          </dd>
-        </div>
+            <Link 
+              href={`/processos/${sub.hash}`}
+              className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:mt-0"
+            >
+              Ver Detalhes
+            </Link>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -269,26 +135,13 @@ export default async function DetalhesProcesso({
     after(async () => {
       try {
         console.log(`[SWR] Iniciando sync reativo (TTL) para o processo ${p.num}/${p.ano} (hash: ${hash})`);
-        const processoDetail = await obterDetalheInterno(hash);
         
-        if (processoDetail) {
-          const row = flattenProcessoParaRow(processoDetail);
-          
-          const qtdeAntiga = Array.isArray(p.movimentacoes) ? p.movimentacoes.length : 0;
-          const qtdeNova = Array.isArray(row.movimentacoes) ? row.movimentacoes.length : 0;
-
-          if (qtdeAntiga !== qtdeNova || ultimaSinc === 0) {
-            console.log(`[SWR] Diferença detectada (ou 1ª vez). Executando Upsert no processo ${hash}`);
-            const { error } = await supabaseAdmin.from("processos_emendas").upsert(row);
-            if (error) console.error(`[SWR] Erro no upsert:`, error);
-          } else {
-            console.log(`[SWR] Nenhuma novidade no processo ${hash}. Atualizando apenas ultima_sincronizacao.`);
-            const { error } = await supabaseAdmin
-              .from("processos_emendas")
-              .update({ ultima_sincronizacao: new Date().toISOString() })
-              .eq("hash", hash);
-            if (error) console.error(`[SWR] Erro no update do TTL:`, error);
-          }
+        const result = await syncProcessByHash(hash);
+        
+        if (!result) {
+          console.error(`[SWR] Falha no sync-core do hash: ${hash}`);
+        } else {
+          console.log(`[SWR] Sincronização concluída (TimeExceeded: ${result.timeExceeded})`);
         }
       } catch (err) {
         console.error(`[SWR] Falha no background sync do processo ${hash}:`, err);
@@ -300,48 +153,45 @@ export default async function DetalhesProcesso({
   const movimentacoes = Array.isArray(p.movimentacoes) ? p.movimentacoes : [];
   const anexos = Array.isArray(p.anexos) ? p.anexos : [];
 
-  // Adaptadores para reaproveitar os componentes UI
-  const temSaude = !!p.emenda_num_emenda || !!p.emenda_origem;
-  const temSocial = !!p.social_num_emenda || !!p.social_origem;
+  // Buscar subprocessos (onde id_emissao_base == p.id_emissao)
+  const { data: subprocessos } = await supabase
+    .from("processos_emendas")
+    .select("*")
+    .eq("id_emissao_base", p.id_emissao)
+    .order("data", { ascending: false });
 
-  const emendaSaude = temSaude ? {
-    origem: p.emenda_origem || "",
-    lei_portaria: p.emenda_lei_portaria || "",
-    funcao_legislativa: p.emenda_funcao_legislativa || "",
-    num_emenda: p.emenda_num_emenda || "",
-    num_proposta: p.emenda_num_proposta || "",
-    tipo: p.emenda_tipo || "",
-    bloco: p.emenda_bloco || "",
-    valor_disponibilizado: p.emenda_valor_formatado || "",
-    valor_raw: p.emenda_valor_raw || "",
-    exercicio: p.emenda_exercicio || "",
-    banco: p.emenda_banco || "",
-    justificativa: p.emenda_justificativa || "",
-  } : null;
+  // Buscar hash do pai se for um subprocesso
+  let parentHash = null;
+  if (p.id_emissao_base) {
+    const { data: parent } = await supabase
+      .from("processos_emendas")
+      .select("hash")
+      .eq("id_emissao", p.id_emissao_base)
+      .single();
+    if (parent) parentHash = parent.hash;
+  }
 
-  const emendaSocial = temSocial ? {
-    num_emenda: p.social_num_emenda || "",
-    ano: p.social_ano || "",
-    objeto: p.social_objeto || "",
-    origem: p.social_origem || "",
-    modalidade: p.social_modalidade || "",
-    cnpj_concessor: p.social_cnpj_concessor || "",
-    cnpj_beneficiaria: p.social_cnpj_beneficiaria || "",
-    razao_social: p.social_razao_social || "",
-    valor_total: p.social_valor_total || "",
-    autores_repasses: Array.isArray(p.social_autores_repasses) ? p.social_autores_repasses : [],
-  } : null;
+
 
   return (
     <PortalLayout>
       <div className="bg-muted/30">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Voltar para busca
-          </Link>
+          {parentHash ? (
+            <Link
+              href={`/processos/${parentHash}`}
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+            >
+              <ArrowLeft className="h-4 w-4" /> Voltar para o Processo Pai
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" /> Voltar para busca
+            </Link>
+          )}
 
           <div className="mt-6 space-y-6">
             {/* Header do processo */}
@@ -386,9 +236,32 @@ export default async function DetalhesProcesso({
               </div>
             </div>
 
-            {/* Bloco de Emenda Parlamentar */}
-            {emendaSaude && <EmendaBlock emenda={emendaSaude as any} />}
-            {emendaSocial && <EmendaSocialBlock emenda={emendaSocial as any} />}
+            {/* Formulário Dinâmico da Emenda com Blocos Especializados */}
+            {!parentHash && (
+              <>
+                {p.id_assunto === 1915747 && (
+                  <EmendaSaudeBlock formData={p.form_data || []} conteudo={p.conteudo} />
+                )}
+                
+                {(p.id_assunto === 1915739 || p.id_assunto === 1915759) && (
+                  <EmendaTerceiroSetorBlock 
+                    formData={p.form_data || []} 
+                    conteudo={p.conteudo ?? undefined} 
+                    conteudoSemHtml={p.conteudo?.replace(/<[^>]*>?/gm, "").trim()} 
+                    assunto={p.assunto ?? undefined}
+                    idAssunto={p.id_assunto}
+                  />
+                )}
+                
+                {/* Aqui para o estadual federal ou os municipais simples podemos ter um outro bloco */}
+                {p.id_assunto === 1915740 && (
+                  <EmendaMunicipalBlock formData={p.form_data || []} conteudo={p.conteudo} />
+                )}
+              </>
+            )}
+
+            {/* Bloco de Subprocessos */}
+            <SubprocessosBlock subprocessos={subprocessos || []} />
 
             {/* Documentos Anexados & Aviso LGPD */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
@@ -397,7 +270,7 @@ export default async function DetalhesProcesso({
                 <div className="text-sm">
                   <p className="font-semibold">Aviso de Privacidade — LGPD</p>
                   <p className="mt-1 opacity-90">
-                    {emendaSocial 
+                    {(p.id_assunto !== 1915747) 
                       ? "Os documentos comprobatórios das parcerias e convênios estão sendo processados e serão disponibilizados nesta seção em breve, em cumprimento à LAI e ao MROSC."
                       : "Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), os arquivos originais estão restritos a acessos autenticados. Este portal exibe apenas os metadados dos documentos comprobatórios."}
                   </p>
