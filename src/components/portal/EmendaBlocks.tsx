@@ -161,7 +161,7 @@ export function EmendaSaudeBlock({
             <Banknote className="h-4 w-4" />
             Valor Disponibilizado
           </p>
-          <p className="mt-1 text-3xl font-bold sm:text-4xl">{parseValorDisplay(valorDisponibilizado)}</p>
+          <p className="mt-1 text-3xl font-bold sm:text-4xl">{parseValorDisplay("valor", valorDisponibilizado)}</p>
         </div>
       )}
 
