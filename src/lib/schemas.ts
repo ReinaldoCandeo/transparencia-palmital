@@ -114,17 +114,17 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
     emenda_banco: p.emenda?.banco ?? null,
     emenda_justificativa: p.emenda?.justificativa ?? null,
 
-    // Achata campos de emenda Social
-    social_num_emenda: p.emenda_social?.num_emenda ?? null,
-    social_ano: p.emenda_social?.ano ?? null,
-    social_objeto: p.emenda_social?.objeto ?? null,
-    social_origem: p.emenda_social?.origem ?? null,
-    social_modalidade: p.emenda_social?.modalidade ?? null,
-    social_cnpj_concessor: p.emenda_social?.cnpj_concessor ?? null,
-    social_cnpj_beneficiaria: p.emenda_social?.cnpj_beneficiaria ?? null,
-    social_razao_social: p.emenda_social?.razao_social ?? null,
-    social_valor_total: p.emenda_social?.valor_total ?? null,
-    social_autores_repasses: p.emenda_social?.autores_repasses ?? [],
+    // Achata campos de emenda Social ou Esporte (reaproveitamento do schema)
+    social_num_emenda: p.emenda_social?.num_emenda ?? p.emenda_esporte?.num_emenda ?? null,
+    social_ano: p.emenda_social?.ano ?? p.emenda_esporte?.ano ?? null,
+    social_objeto: p.emenda_social?.objeto ?? p.emenda_esporte?.objeto ?? null,
+    social_origem: p.emenda_social?.origem ?? p.emenda_esporte?.origem ?? null,
+    social_modalidade: p.emenda_social?.modalidade ?? p.emenda_esporte?.modalidade ?? null,
+    social_cnpj_concessor: p.emenda_social?.cnpj_concessor ?? p.emenda_esporte?.ente_federado ?? null,
+    social_cnpj_beneficiaria: p.emenda_social?.cnpj_beneficiaria ?? p.emenda_esporte?.cnpj_beneficiaria ?? null,
+    social_razao_social: p.emenda_social?.razao_social ?? p.emenda_esporte?.razao_social ?? null,
+    social_valor_total: p.emenda_social?.valor_total ?? p.emenda_esporte?.valor_total ?? null,
+    social_autores_repasses: p.emenda_social?.autores_repasses ?? p.emenda_esporte?.autores_repasses ?? [],
     
     destino_setor: p.destino_setor,
     situacao_atual: p.situacao_atual_str,
@@ -133,7 +133,7 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
 
   // Remove os objetos aninhados originais para evitar erro PGRST204 no Supabase
   // pois essas colunas não existem na tabela SQL.
-  const { emenda, emenda_social, situacao_atual_str, ...rowLimpa } = row as any;
+  const { emenda, emenda_social, emenda_esporte, situacao_atual_str, ...rowLimpa } = row as any;
   
   return rowLimpa as ProcessoEmendaRow;
 }

@@ -130,6 +130,20 @@ export interface EmendaSocialInfo {
   valor_total: string;
 }
 
+export interface EmendaEsporteInfo {
+  num_emenda: string;
+  ano: string;
+  objeto: string;
+  origem: string;
+  modalidade: string;
+  ente_federado: string;
+  cnpj_beneficiaria: string;
+  razao_social: string;
+  autores_repasses: { num_emenda?: string; nome: string; valor: string }[];
+  valor_total: string;
+}
+
+
 export interface ProcessoPublico {
   id_emissao: string;
   id_emissao_base?: string;
@@ -148,6 +162,7 @@ export interface ProcessoPublico {
   anexos: AnexoPublico[];
   emenda?: EmendaInfo;          // Saúde (1915747) — mantida intacta
   emenda_social?: EmendaSocialInfo; // Social (1915739, 1915740)
+  emenda_esporte?: EmendaEsporteInfo; // Esporte (1915759)
 }
 
 // ─── Configuração ──────────────────────────────────────────────────────────
@@ -230,7 +245,7 @@ function parseMoedaToFloat(valor: string | undefined): number {
   if (!valor) return 0;
   const limpo = valor
     .replace(/R\$/g, "")
-    .replace(/\s/g, "")
+    .replace(/[\s\u00A0\u202F]/g, "")
     .replace(/\./g, "")
     .replace(/,/g, ".");
   const floatVal = parseFloat(limpo);
@@ -360,7 +375,7 @@ function extrairEmendaMunicipal(p: OnedocProcesso): EmendaSocialInfo | undefined
   };
 }
 
-function extrairEmendaEsporte(p: OnedocProcesso): EmendaSocialInfo | undefined {
+function extrairEmendaEsporte(p: OnedocProcesso): EmendaEsporteInfo | undefined {
   if (!p.orgaopedido_1hmg1t1h && !p.paciente_1hpjan1h) return undefined;
 
   const valorFormatado = formatarMoeda(p.rg_1hvcln1h);
@@ -378,14 +393,14 @@ function extrairEmendaEsporte(p: OnedocProcesso): EmendaSocialInfo | undefined {
   const objetoFormatado = numEspelho ? `Espelho Nº ${numEspelho} - ${assuntoProcesso}` : assuntoProcesso;
 
   return {
-    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""),
-    ano:               stripHtml(p.divrequisitante ?? ""),
+    num_emenda:        stripHtml(p.orgaopedido_1hmg1t1h ?? ""), // Nº da Emenda (5.8)
+    ano:               stripHtml(p.divrequisitante ?? ""), // Exercício (2025)
     objeto:            objetoFormatado,
-    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""), 
-    modalidade:        stripHtml(p.cpf_1hui711h ?? ""),
-    cnpj_concessor:    stripHtml(p.paciente_1hdyef1h ?? ""),
-    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""),
-    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""),
+    origem:            stripHtml((p as any)["4_1ha5rk1h"] ?? ""), // Esfera (Municipal)
+    modalidade:        stripHtml(p.cpf_1hui711h ?? ""), // GND (3)
+    ente_federado:     stripHtml(p.paciente_1hdyef1h ?? ""), // Ente Federado (Prefeitura)
+    cnpj_beneficiaria: stripHtml(p.rg_1h5hxq1h ?? ""), // CNPJ Unidade Benef
+    razao_social:      stripHtml(p.responsave_1hl4nm1h ?? ""), // Razão Social (Prefeitura)
     autores_repasses:  autores,
     valor_total:       valor_total_calculado,
   };
@@ -431,7 +446,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     // Fallback: constrói o formato brasileiro a partir de num + ano.
     // Ex: num=2663, ano=2026 → "2.663/2026"
     num_formatado: p.num_formatado || `${Number(p.num).toLocaleString("pt-BR")}/${p.ano}`,
-    id_assunto: p.id_assunto,
+    id_assunto: Number(p.id_assunto),
     assunto: stripHtml(p.assunto ?? ""),
     data: p.data,
     hora: p.hora,
@@ -440,10 +455,11 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     situacao_atual_str: p.situacao_atual_str,
     emenda: processoTerceiroSetor ? undefined : extrairEmenda(p),
     emenda_social: processoTerceiroSetor ? (
-      p.id_assunto === 1915739 ? extrairEmendaMunicipal(p) :
-      p.id_assunto === 1915759 ? extrairEmendaEsporte(p) :
-      extrairEmendaSocial(p)
+      Number(p.id_assunto) === 1915739 ? extrairEmendaMunicipal(p) :
+      Number(p.id_assunto) === 1915740 ? extrairEmendaSocial(p) :
+      undefined
     ) : undefined,
+    emenda_esporte: processoTerceiroSetor && Number(p.id_assunto) === 1915759 ? extrairEmendaEsporte(p) : undefined,
     movimentacoes: (p.movimentacoes ?? [])
       .filter((m) => m.data && m.data !== "0000-00-00")
       .map((m) => ({
@@ -515,7 +531,7 @@ export async function obterProcessosPaginadoInterno(
     }
 
     const processos = paginaDados.emissoes
-      .filter((p) => ASSUNTOS_EMENDA.has(p.id_assunto))
+      .filter((p) => ASSUNTOS_EMENDA.has(Number(p.id_assunto)))
       .map(sanitizarProcesso);
     // A API retorna 20 itens por página (corrigido de 15)
     const totalPaginas = Math.ceil((paginaDados.total || 0) / 20) || 1;
@@ -529,7 +545,7 @@ export async function obterProcessosPaginadoInterno(
 
 // ─── Busca Exata por Número e Ano (Proxy Direct Search) ───────────────────
 
-async function obterHashPorNumeroInterno(
+export async function obterHashPorNumeroInterno(
   numero: string,
   ano: string
 ): Promise<string | null> {
