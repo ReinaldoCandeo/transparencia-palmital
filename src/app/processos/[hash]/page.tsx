@@ -263,19 +263,8 @@ export default async function DetalhesProcesso({
             {/* Bloco de Subprocessos */}
             <SubprocessosBlock subprocessos={subprocessos || []} />
 
-            {/* Documentos Anexados & Aviso LGPD */}
+            {/* Documentos Anexados */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-              <div className="mb-4 flex items-start gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-yellow-800 dark:text-yellow-200">
-                <ShieldAlert className="h-5 w-5 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-semibold">Aviso de Privacidade — LGPD</p>
-                  <p className="mt-1 opacity-90">
-                    {(p.id_assunto !== 1915747) 
-                      ? "Os documentos comprobatórios das parcerias e convênios estão sendo processados e serão disponibilizados nesta seção em breve, em cumprimento à LAI e ao MROSC."
-                      : "Em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), os arquivos originais estão restritos a acessos autenticados. Este portal exibe apenas os metadados dos documentos comprobatórios."}
-                  </p>
-                </div>
-              </div>
 
               <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                 <FileText className="h-5 w-5 text-muted-foreground" /> Documentos

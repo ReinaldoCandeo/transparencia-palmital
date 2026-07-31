@@ -73,11 +73,7 @@ function extrairFormData(p: any): { label: string; valor: string; tipo?: string 
         valorFormatado = formatarMoeda(valorFormatado);
       }
 
-      // Ocultar agência e conta (LGPD)
-      const labelLower = labelStr.toLowerCase();
-      if (labelLower.includes("agência") || labelLower.includes("conta")) {
-        valorFormatado = "*** OCULTADO (LGPD) ***";
-      }
+      // Ocultar agência e conta foi removido (Transparência Ativa)
 
       formData.push({ label: labelStr, valor: valorFormatado, tipo: def.tipo });
     }
@@ -101,18 +97,16 @@ async function resyncFormData() {
     return;
   }
 
-  // Filtra os que ainda não têm form_data ou têm array vazio
-  const semFormData = processos.filter(
-    (p) => !Array.isArray(p.form_data) || p.form_data.length === 0
-  );
+  // Agora re-sincroniza todos os processos para recuperar dados bancários que haviam sido ocultados
+  const alvosSync = processos;
 
-  console.log(`📋 Total no banco: ${processos.length} | Sem form_data: ${semFormData.length}`);
+  console.log(`📋 Total no banco: ${processos.length} | Alvos de sync: ${alvosSync.length}`);
 
   let atualizado = 0;
   let semCampos = 0;
   let erros = 0;
 
-  for (const proc of semFormData) {
+  for (const proc of alvosSync) {
     const { hash, num, ano } = proc;
     process.stdout.write(`  ⟳  ${num}/${ano} (${hash.slice(0, 8)}...)  `);
 
