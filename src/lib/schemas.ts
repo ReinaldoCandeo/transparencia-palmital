@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { ProcessoPublico } from "./onedoc";
+import {
+  extractSearchAutores,
+  extractSearchEsfera,
+  extractSearchCategoria,
+} from "@/lib/search-extractors";
 
 /**
  * Schema Zod de validação rigorosa para a tabela `processos_emendas`.
@@ -64,6 +69,11 @@ export const processoEmendaSchema = z.object({
       url_storage: z.string().nullable().optional(),
     })
   ).nullable().default([]),
+  // Colunas de busca planas (flattening para performance)
+  search_autores:   z.string().nullable().optional(),
+  search_esfera:    z.string().nullable().optional(),
+  search_categoria: z.string().nullable().optional(),
+  search_ano:       z.number().int().nullable().optional(),
 });
 
 // Tipagem inferida para uso no TypeScript
@@ -74,21 +84,26 @@ export type ProcessoEmendaRow = z.infer<typeof processoEmendaSchema>;
  * para o formato flat exigido pelo schema do Zod (e pela tabela do Supabase).
  */
 export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
+  const formData = p.form_data || [];
+  const conteudoSemHtml = p.conteudo?.replace(/<[^>]*>?/gm, "").trim();
+  const anoNum = p.ano ? parseInt(p.ano) : null;
+
   const row: ProcessoEmendaRow = {
     ...p,
-    // Metadados flexíveis da UI baseada em JSONB
-    form_data: p.form_data || [],
-    
+    form_data: formData,
     destino_setor: p.destino_setor,
     situacao_atual: p.situacao_atual_str,
     ultima_sincronizacao: new Date().toISOString(),
     conteudo: p.conteudo,
+    // Colunas de busca planas
+    search_autores:   extractSearchAutores(formData, conteudoSemHtml) || null,
+    search_esfera:    extractSearchEsfera(formData) || null,
+    search_categoria: extractSearchCategoria(p.id_assunto),
+    search_ano:       !isNaN(anoNum as number) ? anoNum : null,
   };
 
-  // Remove os objetos originais do processo público que não vão pro banco
   const { situacao_atual_str, form_data: _form, ...rowLimpa } = row as any;
-  // Readiciona form_data garantido
   rowLimpa.form_data = row.form_data;
-  
+
   return rowLimpa as ProcessoEmendaRow;
 }
