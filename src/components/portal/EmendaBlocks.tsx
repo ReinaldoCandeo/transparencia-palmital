@@ -46,6 +46,7 @@ const WHITELIST_SAUDE = new Set([
   "origem", "tipo", "bloco", "proposta", "portaria", "lei",
   "no da emenda", "no emenda", "demanda", "exercicio",
   "valor disponibilizado", "dados bancarios", "funcao legislativa",
+  "agencia", "no da conta", "n. da conta", "conta", "nome do banco", "banco"
 ]);
 
 const WHITELIST_MUNICIPAL = new Set([
@@ -57,18 +58,32 @@ const WHITELIST_MUNICIPAL = new Set([
 
 function parseValorDisplay(label: string, valor: string | null | undefined): string {
   if (!valor) return "";
-  if (valor.includes("R$")) return valor;
+
+  // Sanitize array stringified values like '["Federal"]'
+  let cleanValor = valor;
+  if (valor.trim().startsWith("[") && valor.trim().endsWith("]")) {
+    try {
+      const parsed = JSON.parse(valor);
+      if (Array.isArray(parsed)) {
+        cleanValor = parsed.join(", ");
+      }
+    } catch (e) {
+      // If it fails to parse, keep the original
+    }
+  }
+
+  if (cleanValor.includes("R$")) return cleanValor;
   
   // Não formata como moeda se for ano, número, exercício, etc.
   const normLabel = normalizeLabel(label);
   const isMoeda = normLabel.includes("valor") || normLabel.includes("total") || normLabel.includes("repasse");
   
   if (isMoeda) {
-    const num = parseMoedaToNumber(valor);
+    const num = parseMoedaToNumber(cleanValor);
     if (num > 0) return formatMoedaBR(num);
   }
   
-  return valor;
+  return cleanValor;
 }
 
 function extractEntityFromAssunto(assunto?: string | null): string | null {
@@ -127,43 +142,43 @@ export function EmendaSaudeBlock({
 }) {
   const valorDisponibilizado = extractFromForm(formData, "valor disponibilizado");
   const temDadosBancarios = (formData || []).some(
-    (f) => normalizeLabel(f.label || "").includes("bancarios")
+    (f) => normalizeLabel(f.label || "").includes("bancarios") || normalizeLabel(f.label || "").includes("agencia") || normalizeLabel(f.label || "").includes("conta") || normalizeLabel(f.label || "").includes("banco")
   );
 
-  // Grid dinâmico via whitelist — exclui o valor (exibido no banner) e dados bancários (mascarado)
+  // Grid dinâmico via whitelist — exclui o valor (exibido no header)
   const camposGrid = (formData || []).filter((item) => {
     if (!item.label || !item.valor) return false;
     const norm = normalizeLabel(item.label);
     if (norm.includes("valor disponibilizado")) return false; // já no banner
-    if (norm.includes("bancarios")) return false; // mascarado
     return Array.from(WHITELIST_SAUDE).some((w) => norm.includes(w));
   });
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-border px-6 py-5 sm:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
-            <Landmark className="h-5 w-5" />
+      {/* Header verde premium */}
+      <div className="bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-100 dark:border-emerald-900/50 px-6 py-5 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+            <Landmark className="h-6 w-6" />
           </div>
-          <div>
-            <h3 className="text-base font-bold text-foreground">Emenda Parlamentar — Informações Públicas</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Dados do Formulário de Controle Interno de Emendas — Saúde</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-emerald-700 dark:text-emerald-400">Saúde — Destinação Direta</h3>
+            <p className="mt-0.5 text-sm text-emerald-600/80 dark:text-emerald-400/70">
+              Formulário de Controle Interno de Emendas
+            </p>
           </div>
+          {valorDisponibilizado && (
+            <div className="text-right shrink-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600/70">
+                Valor Disponibilizado
+              </p>
+              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                {parseValorDisplay("valor", valorDisponibilizado)}
+              </p>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Banner verde com valor */}
-      {valorDisponibilizado && (
-        <div className="bg-emerald-700 px-6 py-5 sm:px-8 text-white">
-          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-200 flex items-center gap-2">
-            <Banknote className="h-4 w-4" />
-            Valor Disponibilizado
-          </p>
-          <p className="mt-1 text-3xl font-bold sm:text-4xl">{parseValorDisplay("valor", valorDisponibilizado)}</p>
-        </div>
-      )}
 
       <div className="p-6 sm:p-8 space-y-6">
         {/* Grid de campos com ícones */}
@@ -186,11 +201,11 @@ export function EmendaSaudeBlock({
 
         {/* Aviso sobre dados bancários */}
         {temDadosBancarios && (
-          <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/30 text-sm">
-            <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" />
-            <p className="text-blue-800 dark:text-blue-300">
-              <span className="font-semibold">Dados bancários protegidos: </span>
-              O número da agência e da conta corrente são omitidos neste portal por proteção de infraestrutura pública, em conformidade com as boas práticas de segurança da informação e LGPD.
+          <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30 text-sm">
+            <ShieldAlert className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <p className="text-emerald-800 dark:text-emerald-300">
+              <span className="font-semibold">Transparência Ativa: </span>
+              A disponibilização dos dados bancários atende aos requisitos da Lei 14.133/2021 e de Transparência Pública para rastreamento de recursos. A exibição destas contas estritamente públicas não viola a LGPD.
             </p>
           </div>
         )}
@@ -384,8 +399,8 @@ export function EmendaTerceiroSetorBlock({
           </div>
         )}
 
-        {/* Conteúdo textual — só quando não há rateio nem dados suficientes */}
-        {conteudo && rateios.length === 0 && !beneficiaria && (
+        {/* Conteúdo textual / Justificativa / Objeto - Ocultado no Terceiro Setor (1915739) se já extraímos rateios */}
+        {conteudo && (idAssunto !== 1915739 || rateios.length === 0) && (
           <div className="border-t pt-5">
             <h4 className="mb-2 text-sm font-bold text-muted-foreground">Justificativa / Objeto</h4>
             <div
@@ -415,24 +430,41 @@ export function EmendaMunicipalBlock({
   });
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-      <h3 className="mb-4 text-lg font-bold text-foreground">Destinação Direta (Municipal)</h3>
-      {camposGrid.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {camposGrid.map((item, i) => (
-            <Campo key={i} label={item.label} valor={parseValorDisplay(item.label, item.valor)} />
-          ))}
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+      {/* Header roxo premium */}
+      <div className="bg-purple-50 dark:bg-purple-950/30 border-b border-purple-100 dark:border-purple-900/50 px-6 py-5 sm:px-8">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-sm">
+            <Building className="h-6 w-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-purple-700 dark:text-purple-400">Destinação Direta (Municipal)</h3>
+            <p className="mt-0.5 text-sm text-purple-600/80 dark:text-purple-400/70">
+              Formulário de Controle Interno
+            </p>
+          </div>
         </div>
-      )}
-      {conteudo && (
-        <div className="mt-6 border-t pt-5">
-          <h4 className="mb-2 text-sm font-bold text-muted-foreground">Observações do Processo</h4>
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
-            dangerouslySetInnerHTML={{ __html: conteudo }}
-          />
-        </div>
-      )}
+      </div>
+
+      <div className="p-6 sm:p-8 space-y-6">
+        {camposGrid.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+            {camposGrid.map((item, i) => (
+              <Campo key={i} label={item.label} valor={parseValorDisplay(item.label, item.valor)} />
+            ))}
+          </div>
+        )}
+
+        {conteudo && (
+          <div className="border-t pt-5">
+            <h4 className="mb-2 text-sm font-bold text-muted-foreground">Observações do Processo</h4>
+            <div
+              className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+              dangerouslySetInnerHTML={{ __html: conteudo }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

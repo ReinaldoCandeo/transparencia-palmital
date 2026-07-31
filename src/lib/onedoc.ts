@@ -257,11 +257,7 @@ function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tip
         valorFormatado = formatarMoeda(valorFormatado);
       }
 
-      // Ocultar dados bancários estritos na extração
-      const labelLower = labelStr.toLowerCase();
-      if (labelLower.includes("agência") || labelLower.includes("conta")) {
-        valorFormatado = "*** OCULTADO (LGPD) ***";
-      }
+      // Ocultar dados bancários estritos na extração foi removido (Transparência Ativa)
 
       formData.push({
         label: labelStr,
