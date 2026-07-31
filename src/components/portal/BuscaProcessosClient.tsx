@@ -1,18 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+
+import { useRouter, usePathname } from "next/navigation";
 import {
-  Search,
   ArrowRight,
   FileText,
   ShieldCheck,
-  Building,
-  Target,
-  Clock3,
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
+import { PainelBuscaUnificado, type FiltrosAtivos } from "@/components/portal/PainelBuscaUnificado";
 import type { ProcessoEmendaRow } from "@/lib/schemas";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -83,65 +80,15 @@ export default function BuscaProcessosClient({
   processos,
   paginaAtual,
   totalPaginas,
+  filtrosAtivos,
 }: {
   processos: ProcessoEmendaRow[];
   paginaAtual: number;
   totalPaginas: number;
+  filtrosAtivos: FiltrosAtivos;
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-
-
-  const [termoBusca, setTermoBusca] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
-
-  const handlePageChange = (newPage: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("pagina", newPage.toString());
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const handleBuscaDireta = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearchError("");
-    if (!termoBusca.trim()) return;
-
-    // Higienização à prova de 'Dedo Gordo'
-    const cleanInput = termoBusca.replace(/\s+/g, "").replace(/[\.\-\,]/g, "/");
-    const parts = cleanInput.split("/").filter(Boolean);
-    const num = parts[0];
-    const ano = parts[1] || "";
-
-    if (!num) {
-      setSearchError("Formato inválido. Digite o número do processo.");
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const res = await fetch(
-        `/api/processos/busca-direta?numero=${num}&ano=${ano}`
-      );
-      if (!res.ok) {
-        setSearchError("Processo não encontrado no ano informado.");
-        setIsSearching(false);
-        return;
-      }
-      const data = await res.json();
-      if (data.hash) {
-        router.push(`/processos/${data.hash}`);
-      } else {
-        setSearchError("Processo não localizado na base de dados.");
-        setIsSearching(false);
-      }
-    } catch (err) {
-      setSearchError("Erro ao consultar o processo. Tente novamente.");
-      setIsSearching(false);
-    }
-  };
 
   return (
     <PortalLayout>
@@ -169,46 +116,14 @@ export default function BuscaProcessosClient({
               Acompanhe a tramitação completa dos processos da Prefeitura
               Municipal com rastro auditável.
             </p>
-
-            <form onSubmit={handleBuscaDireta} className="mt-8">
-              <label className="text-sm font-semibold mb-2 block text-primary-foreground/90">
-                <Target className="inline-block w-4 h-4 mr-1 mb-0.5" />
-                Busca Exata por Número e Ano
-              </label>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl bg-background/10 p-2 text-foreground shadow-lg ring-1 ring-black/5 backdrop-blur-md">
-                
-                <div className="flex w-full sm:w-auto flex-1 items-center gap-2 pl-2 bg-background rounded-lg">
-                  <Search className="h-5 w-5 text-muted-foreground ml-2" />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    required
-                    value={termoBusca}
-                    onChange={(e) => setTermoBusca(e.target.value)}
-                    placeholder='Ex: 2504 ou 2504/2026'
-                    className="w-full bg-transparent py-2.5 px-2 text-sm outline-none placeholder:text-muted-foreground sm:text-base"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSearching}
-                  className="w-full sm:w-auto shrink-0 items-center justify-center gap-1.5 rounded-lg bg-background text-primary px-6 py-2.5 text-sm font-bold shadow-sm hover:bg-background/90 disabled:opacity-50 inline-flex transition-colors"
-                >
-                  {isSearching ? "Buscando..." : "Buscar Direto"}
-                </button>
-              </div>
-              {searchError && (
-                <p className="mt-2 text-sm font-medium text-red-200 bg-red-900/40 px-3 py-1.5 rounded-md inline-block backdrop-blur border border-red-500/30">
-                  {searchError}
-                </p>
-              )}
-            </form>
           </div>
         </div>
       </section>
 
-      {/* Listagem Exploratória (SSR Paginada) */}
+      {/* Painel de Controle Unificado (Filtros + Acesso Direto) - FLUTUANTE */}
+      <PainelBuscaUnificado filtrosAtivos={filtrosAtivos} />
+
+      {/* Listagem Exploratória (SSR Filtrada) */}
       <section className="mx-auto max-w-7xl px-4 py-10">
         <div className="mt-12 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
@@ -217,12 +132,10 @@ export default function BuscaProcessosClient({
               Listagem Geral (Últimos Processos)
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Página {paginaAtual} de {totalPaginas}
+              {processos.length} processo{processos.length !== 1 ? "s" : ""} encontrado{processos.length !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
-
-
 
         {/* Tabela (desktop) */}
         <div className="mt-6 hidden overflow-hidden rounded-xl border border-border bg-card md:block">
