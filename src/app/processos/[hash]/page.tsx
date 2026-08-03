@@ -24,6 +24,7 @@ import { supabase } from "@/lib/db-client";
 import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
 import { after } from "next/server";
 import { EmendaSaudeBlock, EmendaTerceiroSetorBlock, EmendaMunicipalBlock } from "@/components/portal/EmendaBlocks";
+import { ASSUNTOS_SAUDE, ASSUNTOS_TERCEIRO_SETOR } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
 import { flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
@@ -239,11 +240,11 @@ export default async function DetalhesProcesso({
             {/* Formulário Dinâmico da Emenda com Blocos Especializados */}
             {!parentHash && (
               <>
-                {p.id_assunto === 1915747 && (
+                {ASSUNTOS_SAUDE.has(p.id_assunto) && (
                   <EmendaSaudeBlock formData={p.form_data || []} conteudo={p.conteudo} />
                 )}
-                
-                {(p.id_assunto === 1915739 || p.id_assunto === 1915759) && (
+
+                {ASSUNTOS_TERCEIRO_SETOR.has(p.id_assunto) && (
                   <EmendaTerceiroSetorBlock 
                     formData={p.form_data || []} 
                     conteudo={p.conteudo ?? undefined} 
@@ -251,11 +252,6 @@ export default async function DetalhesProcesso({
                     assunto={p.assunto ?? undefined}
                     idAssunto={p.id_assunto}
                   />
-                )}
-                
-                {/* Aqui para o estadual federal ou os municipais simples podemos ter um outro bloco */}
-                {p.id_assunto === 1915740 && (
-                  <EmendaMunicipalBlock formData={p.form_data || []} conteudo={p.conteudo} />
                 )}
               </>
             )}
