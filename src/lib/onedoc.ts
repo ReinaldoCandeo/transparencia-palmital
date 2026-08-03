@@ -271,11 +271,30 @@ function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tip
   }
 }
 
+// ─── Grupos Semânticos de Assuntos ─────────────────────────────────────────
+// Fonte única de verdade para toda a regra de negócio do portal.
+// Para adicionar um novo ID: inclua aqui + em ASSUNTOS_EMENDA abaixo.
+
+/** Controle interno de saúde (emendas federais MAC) */
+export const ASSUNTOS_SAUDE = new Set([
+  1915747, // Controle Interno de Emendas - SAÚDE
+]);
+
+/** Todos os IDs que representam o fluxo "Terceiro Setor" */
+export const ASSUNTOS_TERCEIRO_SETOR = new Set([
+  1915739, // Terceiro Setor - Emendas Municipais - SOCIAL
+  1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - SOCIAL
+  1915759, // Emenda Parlamentar - ESPORTE (formato antigo)
+  1915774, // Terceiro Setor - Emendas Municipais - AGRICULTURA E MEIO AMBIENTE
+  1915763, // Terceiro Setor - Emendas Municipais - EDUCAÇÃO E CULTURA
+  1915772, // Terceiro Setor - Emendas Municipais - ESPORTE
+  1915764, // Terceiro Setor - Emendas Municipais - SAÚDE
+]);
+
+/** União de todos os assuntos aceitos pelo portal (porteira de ingestão) */
 export const ASSUNTOS_EMENDA = new Set([
-  1915747, // MAC - Emenda Federal - Saúde
-  1915739, // Terceiro Setor - Emenda Municipais - Social
-  1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - Social
-  1915759, // Terceiro Setor - Emenda Parlamentar - Esporte
+  ...ASSUNTOS_SAUDE,
+  ...ASSUNTOS_TERCEIRO_SETOR,
 ]);
 
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
