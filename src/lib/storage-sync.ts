@@ -17,7 +17,7 @@ function slugifyFilename(filename: string) {
  * Baixa um anexo da 1Doc e envia para o Supabase Storage.
  * Retorna a URL pública em caso de sucesso ou null em caso de erro.
  */
-export async function syncAnexoStorage(hash: string, urlOriginal: string, filename: string): Promise<string | null> {
+export async function syncAnexoStorage(hash: string, urlOriginal: string, filename: string, idExterno?: string): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000); // 30s de limite por arquivo
@@ -35,7 +35,8 @@ export async function syncAnexoStorage(hash: string, urlOriginal: string, filena
 
     const blob = await res.blob();
     const safeName = slugifyFilename(filename);
-    const path = `${hash}/${safeName}`;
+    const prefix = idExterno ? `${idExterno}_` : '';
+    const path = `${hash}/${prefix}${safeName}`;
 
     // Faz o upload de forma idempotente
     const { error: uploadError } = await supabaseAdmin

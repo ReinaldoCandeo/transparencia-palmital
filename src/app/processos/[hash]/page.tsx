@@ -370,8 +370,8 @@ export default async function DetalhesProcesso({
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {doc.arquivo}
+                        <p className="truncate text-sm font-medium text-foreground" title={doc.arquivo.replace(/^\d+_/, "")}>
+                          {doc.arquivo.replace(/^\d+_/, "")}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {doc.extensao?.toUpperCase()} •{" "}
@@ -458,8 +458,8 @@ export default async function DetalhesProcesso({
                                     <>
                                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                                       <div className="min-w-0 flex-1">
-                                        <p className="truncate text-xs font-medium text-foreground">
-                                          {anexo.arquivo}
+                                        <p className="truncate text-sm font-medium text-foreground" title={anexo.arquivo.replace(/^\d+_/, "")}>
+                                          {anexo.arquivo.replace(/^\d+_/, "")}
                                         </p>
                                         <p className="text-[10px] text-muted-foreground">
                                           {anexo.extensao?.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
