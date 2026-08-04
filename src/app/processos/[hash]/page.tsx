@@ -203,7 +203,7 @@ export default async function DetalhesProcesso({
     // Se as datas forem inválidas (NaN), mantém a ordem original
     if (isNaN(timeA) || isNaN(timeB)) return 0;
     
-    return timeB - timeA;
+    return timeA - timeB;
   });
 
   let anexos = Array.isArray(p.anexos) ? [...p.anexos] : [];
@@ -211,9 +211,10 @@ export default async function DetalhesProcesso({
   // Deduplicar anexos principais pelo nome do arquivo
   const seenAnexos = new Set();
   anexos = anexos.filter(a => {
-    if (!a.arquivo) return true;
-    if (seenAnexos.has(a.arquivo)) return false;
-    seenAnexos.add(a.arquivo);
+    const key = a._url_original || a.url_storage || a.arquivo;
+    if (!key) return true;
+    if (seenAnexos.has(key)) return false;
+    seenAnexos.add(key);
     return true;
   });
 
