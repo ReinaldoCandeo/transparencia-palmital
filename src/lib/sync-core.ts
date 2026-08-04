@@ -66,14 +66,14 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   if (dbData) {
     if (Array.isArray(dbData.anexos)) {
       dbData.anexos.forEach((a: any) => {
-        if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage);
+        if (a._url_original && a.url_storage) existingUrls.set(a._url_original, a.url_storage);
       });
     }
     if (Array.isArray(dbData.movimentacoes)) {
       dbData.movimentacoes.forEach((m: any) => {
         if (Array.isArray(m.anexos)) {
           m.anexos.forEach((a: any) => {
-            if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage);
+            if (a._url_original && a.url_storage) existingUrls.set(a._url_original, a.url_storage);
           });
         }
       });
@@ -88,8 +88,8 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
       if (!a._url_original) continue;
       
       // Cache
-      if (existingUrls.has(a.arquivo)) {
-        a.url_storage = existingUrls.get(a.arquivo);
+      if (existingUrls.has(a._url_original)) {
+        a.url_storage = existingUrls.get(a._url_original);
         continue;
       }
       

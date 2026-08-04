@@ -466,7 +466,7 @@ export async function obterHashPorNumeroInterno(
     const json = await res.json();
     
     // A 1Doc pode retornar um objeto direto ou dentro de um array `data`
-    const processo = json.data?.[0] || json;
+    const processo = json.data?.[0]?.emissao || json.data?.[0] || json;
     if (processo && processo.hash) {
       return processo.hash;
     }

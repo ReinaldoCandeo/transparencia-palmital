@@ -183,8 +183,39 @@ export default async function DetalhesProcesso({
   }
 
   // Fallback seguro para arrays (JSONB)
-  const movimentacoes = Array.isArray(p.movimentacoes) ? p.movimentacoes : [];
-  const anexos = Array.isArray(p.anexos) ? p.anexos : [];
+  let movimentacoes = Array.isArray(p.movimentacoes) ? [...p.movimentacoes] : [];
+  
+  // Deduplicar movimentações por ID para evitar itens duplicados na linha do tempo
+  const seenMovs = new Set();
+  movimentacoes = movimentacoes.filter(m => {
+    if (!m.id) return true;
+    if (seenMovs.has(m.id)) return false;
+    seenMovs.add(m.id);
+    return true;
+  });
+
+  // Ordenar por data e hora decrescente (mais recentes no topo)
+  movimentacoes.sort((a, b) => {
+    // A API 1Doc fornece: data "YYYY-MM-DD" e hora "HH:MM:SS" (ou "HH:MM")
+    const timeA = new Date(`${a.data}T${a.hora || '00:00:00'}`).getTime();
+    const timeB = new Date(`${b.data}T${b.hora || '00:00:00'}`).getTime();
+    
+    // Se as datas forem inválidas (NaN), mantém a ordem original
+    if (isNaN(timeA) || isNaN(timeB)) return 0;
+    
+    return timeB - timeA;
+  });
+
+  let anexos = Array.isArray(p.anexos) ? [...p.anexos] : [];
+  
+  // Deduplicar anexos principais pelo nome do arquivo
+  const seenAnexos = new Set();
+  anexos = anexos.filter(a => {
+    if (!a.arquivo) return true;
+    if (seenAnexos.has(a.arquivo)) return false;
+    seenAnexos.add(a.arquivo);
+    return true;
+  });
 
   // Buscar subprocessos (onde id_emissao_base == p.id_emissao)
   const { data: subprocessos } = await supabase
