@@ -95,12 +95,12 @@ export function extractSearchCategoria(idAssunto: number): string {
   const MAP: Record<number, string> = {
     1915747: "saude",
     1915739: "terceiro_setor",
-    1915759: "terceiro_setor",
+    1915759: "esporte", // Emenda Parlamentar - ESPORTE (formato antigo)
+    1915772: "terceiro_setor", // Terceiro Setor - Emendas Municipais - ESPORTE
     1915740: "terceiro_setor",
     1915774: "terceiro_setor", // Agricultura e Meio Ambiente
     1915763: "terceiro_setor", // Educação e Cultura
-    1915772: "terceiro_setor", // Esporte
-    1915764: "terceiro_setor", // Saúde (Terceiro Setor)
+    1915764: "terceiro_setor", // Saúde (municipal repasse)
   };
   return MAP[idAssunto] ?? "outros";
 }

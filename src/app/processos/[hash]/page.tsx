@@ -224,10 +224,13 @@ export default async function DetalhesProcesso({
         .in("hash", extractedHashes);
 
       if (dbVinculados) {
-        vinculadosHtml = dbVinculados.map(v => ({
-          ...v,
-          situacao_atual_str: v.situacao_atual // Normaliza para o componente
-        }));
+        const subHashes = new Set(subprocessos?.map(s => s.hash) || []);
+        vinculadosHtml = dbVinculados
+          .filter(v => !subHashes.has(v.hash))
+          .map(v => ({
+            ...v,
+            situacao_atual_str: v.situacao_atual // Normaliza para o componente
+          }));
       }
     }
   }
