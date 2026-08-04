@@ -8,6 +8,7 @@ import {
   FileText,
   ShieldCheck,
 } from "lucide-react";
+import { StatusBadge } from "./StatusBadge";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { PainelBuscaUnificado, type FiltrosAtivos } from "@/components/portal/PainelBuscaUnificado";
 import type { ProcessoEmendaRow } from "@/lib/schemas";
@@ -28,7 +29,20 @@ function normalizeStr(s: string) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u00BA/g, "o").toLowerCase().trim();
 }
 
+function formatSearchAutores(str: string) {
+  if (!str) return "";
+  return str.split(', ').map(name => 
+    name.split(' ').map(word => 
+      ['de', 'da', 'do', 'dos', 'das'].includes(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+  ).join(', ');
+}
+
 function getAutorEmenda(p: ProcessoEmendaRow) {
+  if (p.search_autores) {
+    return formatSearchAutores(p.search_autores);
+  }
+
   if (p.form_data && Array.isArray(p.form_data)) {
     // Busca EXPLÍCITA: apenas labels de autor parlamentar/vereador
     const autores = (p.form_data as any[])
@@ -51,27 +65,6 @@ function getAutorEmenda(p: ProcessoEmendaRow) {
   }
 
   return "Não identificado";
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  "Em Tramitação": "border-blue-500/20 bg-blue-500/10 text-blue-500",
-  Concluído: "border-green-500/20 bg-green-500/10 text-green-500",
-  Arquivado:
-    "border-muted-foreground/20 bg-muted/50 text-muted-foreground",
-};
-
-export function StatusBadge({ status }: { status: string }) {
-  const color =
-    STATUS_COLORS[status] ??
-    "border-gray-500/20 bg-gray-500/10 text-gray-500";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {status}
-    </span>
-  );
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────

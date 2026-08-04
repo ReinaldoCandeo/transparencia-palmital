@@ -117,12 +117,15 @@ export function buildRateioTable(
   conteudoSemHtml: string | undefined
 ): RateioEmenda[] {
   // 1. Tenta montar o Autor Principal a partir do form_data
+  // Busca variações comuns de nomenclaturas
   const nomeAutor =
     extractFromForm(formData, "vereador autor") ||
     extractFromForm(formData, "parlamentar autor") ||
+    extractFromForm(formData, "autor") ||
+    extractFromForm(formData, "vereador") ||
     null;
   
-  const numEmenda = extractFromForm(formData, "no da emenda") || extractFromForm(formData, "n. da emenda") || "";
+  const numEmenda = extractFromForm(formData, "no da emenda") || extractFromForm(formData, "n. da emenda") || extractFromForm(formData, "emenda") || "";
   const valorPrincipal = extractFromForm(formData, "valor") || extractFromForm(formData, "total programado") || "";
 
   // 2. Extrai autores secundários via Regex do texto livre

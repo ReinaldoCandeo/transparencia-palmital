@@ -38,27 +38,19 @@ export function extractSearchAutores(
 ): string {
   if (!Array.isArray(formData)) return "";
 
-  // 1. Tenta via form_data (Saúde e formulários com campo explícito de autor)
-  const autoresForm = formData
-    .filter((f: any) => {
-      const norm = normalizeLabel(f.label || "");
-      return norm.includes("vereador autor") || norm.includes("parlamentar autor");
-    })
-    .map((f: any) => f.valor as string)
-    .filter(Boolean);
-
-  if (autoresForm.length > 0) {
-    return removeAcentos(autoresForm.join(", "));
-  }
-
-  // 2. Fallback: extrai via buildRateioTable (Terceiro Setor com texto livre)
+  // 1. A função buildRateioTable já tem a inteligência de unir o Autor Principal (do form_data)
+  // com os Autores Secundários (extraídos do texto livre via regex), sem duplicatas.
   const rateios = buildRateioTable(formData, conteudoSemHtml);
   if (rateios.length > 0) {
     return removeAcentos(rateios.map((r) => r.autor).join(", "));
   }
 
-  // 3. Fallback final: tenta pegar do campo genérico "autor"
-  const autorGenerico = extractFromForm(formData, "autor");
+  // 2. Fallback final: tenta pegar do campo genérico "autor" ou form explícito caso a regex tenha falhado
+  const autorGenerico = 
+    extractFromForm(formData, "vereador autor") ||
+    extractFromForm(formData, "parlamentar autor") ||
+    extractFromForm(formData, "autor");
+    
   if (autorGenerico) return removeAcentos(autorGenerico);
 
   return "";
@@ -103,12 +95,39 @@ export function extractSearchCategoria(idAssunto: number): string {
   const MAP: Record<number, string> = {
     1915747: "saude",
     1915739: "terceiro_setor",
-    1915759: "terceiro_setor",
+    1915759: "esporte", // Emenda Parlamentar - ESPORTE (formato antigo)
+    1915772: "terceiro_setor", // Terceiro Setor - Emendas Municipais - ESPORTE
     1915740: "terceiro_setor",
     1915774: "terceiro_setor", // Agricultura e Meio Ambiente
     1915763: "terceiro_setor", // Educação e Cultura
-    1915772: "terceiro_setor", // Esporte
-    1915764: "terceiro_setor", // Saúde (Terceiro Setor)
+    1915764: "terceiro_setor", // Saúde (municipal repasse)
   };
   return MAP[idAssunto] ?? "outros";
+}
+
+/**
+ * Extrai o ano da emenda do formulário ou do texto livre.
+ * Procura por "Exercício", "Ano" ou "Ano da Emenda" no form_data.
+ * Fallback para o texto livre se necessário.
+ */
+export function extractAnoEmenda(formData: any[], conteudoSemHtml?: string): number | null {
+  if (Array.isArray(formData)) {
+    const item = formData.find((f: any) => {
+      const norm = normalizeLabel(f.label || "");
+      return norm.includes("exercicio") || norm === "ano" || norm.includes("ano da emenda");
+    });
+    if (item?.valor) {
+      const match = item.valor.match(/\b(20\d{2})\b/);
+      if (match) return parseInt(match[1], 10);
+    }
+  }
+
+  if (conteudoSemHtml) {
+    const match = conteudoSemHtml.match(/\b(?:exerc[ií]cio|ano)(?:\s+de)?\s*(20\d{2})\b/i);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+
+  return null;
 }

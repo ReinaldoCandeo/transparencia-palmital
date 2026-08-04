@@ -4,6 +4,7 @@ import {
   extractSearchAutores,
   extractSearchEsfera,
   extractSearchCategoria,
+  extractAnoEmenda,
 } from "@/lib/search-extractors";
 
 /**
@@ -46,6 +47,7 @@ export const processoEmendaSchema = z.object({
       data: z.string(),
       hora: z.string(),
       origem_setor: z.string(),
+      conteudo: z.string().optional(),
       anexos: z.array(
         z.object({
           id_externo: z.string().optional(),
@@ -74,6 +76,7 @@ export const processoEmendaSchema = z.object({
   search_esfera:    z.string().nullable().optional(),
   search_categoria: z.string().nullable().optional(),
   search_ano:       z.number().int().nullable().optional(),
+  ano_emenda_ext:   z.number().int().nullable().optional(),
 });
 
 // Tipagem inferida para uso no TypeScript
@@ -98,8 +101,9 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
     // Colunas de busca planas
     search_autores:   extractSearchAutores(formData, conteudoSemHtml) || null,
     search_esfera:    extractSearchEsfera(formData) || null,
-    search_categoria: extractSearchCategoria(p.id_assunto),
+    search_categoria: extractSearchCategoria(p.id_assunto) || null,
     search_ano:       !isNaN(anoNum as number) ? anoNum : null,
+    ano_emenda_ext:   extractAnoEmenda(formData, conteudoSemHtml) || null,
   };
 
   const { situacao_atual_str, form_data: _form, ...rowLimpa } = row as any;

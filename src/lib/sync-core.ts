@@ -12,7 +12,7 @@ import { supabaseAdmin } from "@/lib/db-admin";
  * @param timeoutMs Limite opcional de tempo para downloads sequenciais, em milissegundos
  * @returns O Processo processado ou `null` se der falha ou timeout completo
  */
-export async function syncProcessByHash(hash: string, timeoutMs: number = 50000) {
+export async function syncProcessByHash(hash: string, timeoutMs: number = 50000, forceIdEmissaoBase?: string) {
   const syncStartTime = Date.now();
   let timeExceeded = false;
 
@@ -27,6 +27,11 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000)
 
   // --- GATEKEEPER (Bypass Dinâmico para Subprocessos) ---
   let isEmendaOuSubprocesso = false;
+
+  // Se recebemos via cron que este é um processo vinculado forçado, setamos o id_emissao_base
+  if (forceIdEmissaoBase) {
+    detalheCompleto.id_emissao_base = forceIdEmissaoBase;
+  }
 
   if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto)) {
     isEmendaOuSubprocesso = true;

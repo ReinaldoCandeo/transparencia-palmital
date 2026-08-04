@@ -18,6 +18,8 @@ import {
   formatMoedaBR,
   normalizeLabel,
 } from "@/lib/emendaUtils";
+import { ASSUNTOS_TERCEIRO_SETOR } from "@/lib/onedoc";
+import { extractAnoEmenda } from "@/lib/search-extractors";
 
 // ─── Whitelists ──────────────────────────────────────────────────────────────
 
@@ -244,6 +246,7 @@ export function EmendaTerceiroSetorBlock({
 }) {
   // ── Dados ──────────────────────────────────────────────────────────────────
   const rateios = buildRateioTable(formData, conteudoSemHtml);
+  const anoForm = extractAnoEmenda(formData, conteudoSemHtml);
   const valorGlobal = rateios.reduce((acc, r) => acc + parseMoedaToNumber(r.valor), 0);
 
   const beneficiaria =
@@ -330,30 +333,30 @@ export function EmendaTerceiroSetorBlock({
       <div className="p-6 sm:p-8 space-y-6">
         {/* Entidade + Concessor */}
         {(beneficiaria || concessorNome) && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {beneficiaria && (
               <div>
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                   <Tag className="h-3.5 w-3.5" /> Entidade Beneficiária
-                </p>
-                <p className="mt-2 text-sm font-semibold text-foreground leading-snug">{beneficiaria}</p>
+                </dt>
+                <dd className="mt-2 text-sm font-semibold text-foreground leading-snug">{beneficiaria}</dd>
                 {cnpjBenef && (
-                  <p className="mt-1 text-xs text-muted-foreground font-mono">CNPJ: {cnpjBenef}</p>
+                  <dd className="mt-1 text-xs text-muted-foreground font-mono">CNPJ: {cnpjBenef}</dd>
                 )}
               </div>
             )}
             {concessorNome && (
               <div>
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                   <Building className="h-3.5 w-3.5" /> Órgão Concessor
-                </p>
-                <p className="mt-2 text-sm font-semibold text-foreground leading-snug">{concessorNome}</p>
+                </dt>
+                <dd className="mt-2 text-sm font-semibold text-foreground leading-snug">{concessorNome}</dd>
                 {cnpjConcess && (
-                  <p className="mt-1 text-xs text-muted-foreground font-mono">CNPJ: {cnpjConcess}</p>
+                  <dd className="mt-1 text-xs text-muted-foreground font-mono">CNPJ: {cnpjConcess}</dd>
                 )}
               </div>
             )}
-          </div>
+          </dl>
         )}
 
         {/* Autores dos Repasses — lista inline elegante */}
@@ -363,19 +366,25 @@ export function EmendaTerceiroSetorBlock({
               <Hash className="h-3.5 w-3.5" /> Autores dos Repasses
             </p>
             <ul className="space-y-2">
-              {rateios.map((r, i) => (
-                <li
-                  key={i}
-                  className="flex items-center justify-between gap-4 text-sm rounded-lg px-3 py-2 bg-muted/40"
-                >
-                  <span className="font-medium text-foreground">{r.autor}</span>
-                  <span className="text-muted-foreground text-xs shrink-0">
-                    {r.emenda ? `Emenda nº ${r.emenda}` : ""}
-                    {r.emenda && r.valor ? " — " : ""}
-                    {r.valor ? parseValorDisplay("valor", r.valor) : ""}
-                  </span>
-                </li>
-              ))}
+              {rateios.map((r, i) => {
+                let emendaDisplay = r.emenda ? `Emenda nº ${r.emenda}` : "";
+                if (r.emenda && anoForm && !r.emenda.includes("/")) {
+                  emendaDisplay += `/${anoForm}`;
+                }
+                return (
+                  <li
+                    key={i}
+                    className="flex items-center justify-between gap-4 text-sm rounded-lg px-3 py-2 bg-muted/40"
+                  >
+                    <span className="font-medium text-foreground">{r.autor}</span>
+                    <span className="text-muted-foreground text-xs shrink-0">
+                      {emendaDisplay}
+                      {r.emenda && r.valor ? " — " : ""}
+                      {r.valor ? parseValorDisplay("valor", r.valor) : ""}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
@@ -399,8 +408,8 @@ export function EmendaTerceiroSetorBlock({
           </div>
         )}
 
-        {/* Conteúdo textual / Justificativa / Objeto - Ocultado no Terceiro Setor (1915739) se já extraímos rateios */}
-        {conteudo && (idAssunto !== 1915739 || rateios.length === 0) && (
+        {/* Conteúdo textual / Justificativa / Objeto - Ocultado no Terceiro Setor */}
+        {conteudo && !ASSUNTOS_TERCEIRO_SETOR.has(idAssunto || 0) && (
           <div className="border-t pt-5">
             <h4 className="mb-2 text-sm font-bold text-muted-foreground">Justificativa / Objeto</h4>
             <div

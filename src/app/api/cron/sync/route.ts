@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/db-admin";
-import { obterProcessosPaginadoInterno } from "@/lib/onedoc";
+import { obterProcessosPaginadoInterno, extractVinculadosHashesFromHtml } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
 
 // =========================================================================
@@ -68,13 +68,45 @@ export async function GET(req: NextRequest) {
       // Busca os últimos 500 processos modificados para varredura em memória
       const { data: dbProcessos } = await supabaseAdmin
         .from("processos_emendas")
-        .select("hash, anexos, movimentacoes")
+        .select("hash, anexos, movimentacoes, id_emissao")
         .order("ultima_sincronizacao", { ascending: false })
         .limit(500);
 
       if (dbProcessos) {
-        processosParaSincronizar = dbProcessos
-          .filter((dbProc: any) => {
+        if (mode === "vinculados") {
+          // Extrai todos os hashes vinculados e identifica quais precisam ser baixados
+          const vinculadosMap = new Map<string, string>(); // vinculadoHash -> parentIdEmissao
+          dbProcessos.forEach((dbProc: any) => {
+            if (Array.isArray(dbProc.movimentacoes)) {
+              dbProc.movimentacoes.forEach((m: any) => {
+                if (m.conteudo) {
+                  const hashes = extractVinculadosHashesFromHtml(m.conteudo);
+                  hashes.forEach(h => vinculadosMap.set(h, dbProc.id_emissao));
+                }
+              });
+            }
+          });
+
+          if (vinculadosMap.size > 0) {
+            // Verifica quais já existem
+            const { data: existentes } = await supabaseAdmin
+              .from("processos_emendas")
+              .select("hash")
+              .in("hash", Array.from(vinculadosMap.keys()));
+              
+            const hashesExistentes = new Set(existentes?.map(e => e.hash) || []);
+            
+            // Filtra os que não existem
+            for (const [vHash, parentId] of Array.from(vinculadosMap.entries())) {
+              if (!hashesExistentes.has(vHash)) {
+                processosParaSincronizar.push(`${vHash}:${parentId}`);
+              }
+            }
+          }
+        } else {
+          // Modo retry (anexos pendentes)
+          processosParaSincronizar = dbProcessos
+            .filter((dbProc: any) => {
             let temAnexoPendente = false;
             if (Array.isArray(dbProc.anexos)) {
               if (dbProc.anexos.some((a: any) => a.arquivo && !a.url_storage)) temAnexoPendente = true;
@@ -87,6 +119,7 @@ export async function GET(req: NextRequest) {
             return temAnexoPendente;
           })
           .map((p) => p.hash);
+        }
       }
     }
 
@@ -108,10 +141,20 @@ export async function GET(req: NextRequest) {
     const safeProcessos = [];
 
     // 3. Validação e Sincronização via Camada Core
-    for (const hash of processosLimitados) {
+    for (const item of processosLimitados) {
       if (timeExceeded) break;
 
-      const result = await syncProcessByHash(hash, TIMEOUT_MS);
+      let hashToSync = item;
+      let parentId: string | undefined = undefined;
+
+      // Se for modo vinculados, o item é "hash:parentId"
+      if (mode === "vinculados" && item.includes(":")) {
+        const parts = item.split(":");
+        hashToSync = parts[0];
+        parentId = parts[1];
+      }
+
+      const result = await syncProcessByHash(hashToSync, TIMEOUT_MS, parentId);
       
       if (result) {
         safeProcessos.push(result.data);
