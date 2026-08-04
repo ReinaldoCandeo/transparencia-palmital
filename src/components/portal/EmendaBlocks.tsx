@@ -18,6 +18,7 @@ import {
   formatMoedaBR,
   normalizeLabel,
 } from "@/lib/emendaUtils";
+import { ASSUNTOS_TERCEIRO_SETOR } from "@/lib/onedoc";
 import { extractAnoEmenda } from "@/lib/search-extractors";
 
 // ─── Whitelists ──────────────────────────────────────────────────────────────
@@ -407,8 +408,8 @@ export function EmendaTerceiroSetorBlock({
           </div>
         )}
 
-        {/* Conteúdo textual / Justificativa / Objeto - Ocultado no Terceiro Setor (1915739) se já extraímos rateios */}
-        {conteudo && (idAssunto !== 1915739 || rateios.length === 0) && (
+        {/* Conteúdo textual / Justificativa / Objeto - Ocultado no Terceiro Setor */}
+        {conteudo && !ASSUNTOS_TERCEIRO_SETOR.has(idAssunto || 0) && (
           <div className="border-t pt-5">
             <h4 className="mb-2 text-sm font-bold text-muted-foreground">Justificativa / Objeto</h4>
             <div

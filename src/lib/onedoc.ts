@@ -300,30 +300,37 @@ export const ASSUNTOS_EMENDA = new Set([
   ...ASSUNTOS_TERCEIRO_SETOR,
 ]);
 
-function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
-  const processos_vinculados_hashes: string[] = [];
+export function extractVinculadosHashesFromHtml(html: string): string[] {
+  if (!html) return [];
+  const hashes: string[] = [];
   try {
-    if (p.movimentacoes) {
-      for (const mov of p.movimentacoes) {
-        const conteudoHtml = mov.conteudo;
-        if (conteudoHtml) {
-          // 1. Isola todas as tags <a>
-          const aTags = conteudoHtml.match(/<a\s[^>]+>/gi) || [];
-          for (const aTag of aTags) {
-            // 2. Verifica se é um vínculo (tipo 2 ou classe mention_2)
-            if (aTag.includes('data-tipo="2"') || aTag.includes('mention_2')) {
-              // 3. Extrai o hash de forma agnóstica à ordem dos atributos
-              const hashMatch = aTag.match(/hash=([a-zA-Z0-9]+)/i);
-              if (hashMatch && hashMatch[1]) {
-                processos_vinculados_hashes.push(hashMatch[1]);
-              }
-            }
-          }
+    const aTags = html.match(/<a\s[^>]+>/gi) || [];
+    for (const aTag of aTags) {
+      if (aTag.includes('data-tipo="2"') || aTag.includes('mention_2')) {
+        const hashMatch = aTag.match(/hash=([a-zA-Z0-9]+)/i);
+        if (hashMatch && hashMatch[1]) {
+          hashes.push(hashMatch[1]);
         }
       }
     }
   } catch (err) {
     console.error("[1Doc] Erro silencioso na extração de vínculos HTML:", err);
+  }
+  return hashes;
+}
+
+function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
+  const processos_vinculados_hashes: string[] = [];
+  try {
+    if (p.movimentacoes) {
+      for (const mov of p.movimentacoes) {
+        if (mov.conteudo) {
+          processos_vinculados_hashes.push(...extractVinculadosHashesFromHtml(mov.conteudo));
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[1Doc] Erro silencioso no sanitizarProcesso (vinculados):", err);
   }
 
   // Remove hashes duplicados

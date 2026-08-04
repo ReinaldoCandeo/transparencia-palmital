@@ -29,7 +29,20 @@ function normalizeStr(s: string) {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u00BA/g, "o").toLowerCase().trim();
 }
 
+function formatSearchAutores(str: string) {
+  if (!str) return "";
+  return str.split(', ').map(name => 
+    name.split(' ').map(word => 
+      ['de', 'da', 'do', 'dos', 'das'].includes(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ')
+  ).join(', ');
+}
+
 function getAutorEmenda(p: ProcessoEmendaRow) {
+  if (p.search_autores) {
+    return formatSearchAutores(p.search_autores);
+  }
+
   if (p.form_data && Array.isArray(p.form_data)) {
     // Busca EXPLÍCITA: apenas labels de autor parlamentar/vereador
     const autores = (p.form_data as any[])

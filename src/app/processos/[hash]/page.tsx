@@ -24,7 +24,7 @@ import { supabase } from "@/lib/db-client";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { after } from "next/server";
 import { EmendaSaudeBlock, EmendaTerceiroSetorBlock, EmendaMunicipalBlock } from "@/components/portal/EmendaBlocks";
-import { ASSUNTOS_SAUDE, ASSUNTOS_TERCEIRO_SETOR } from "@/lib/onedoc";
+import { ASSUNTOS_SAUDE, ASSUNTOS_TERCEIRO_SETOR, extractVinculadosHashesFromHtml } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
 import { flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
@@ -69,81 +69,7 @@ function InfoField({
 
 
 
-import { obterDetalheInterno } from "@/lib/onedoc";
-import { unstable_cache } from "next/cache";
 
-// ─── Phase 1: Extração defensiva e Controle de Concorrência ────────────────
-// Helper de concorrência para evitar rate limits
-async function fetchWithConcurrencyLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = [];
-  const executing: Promise<void>[] = [];
-  
-  for (const item of items) {
-    const p = fn(item).then(res => {
-      results.push(res);
-    });
-    executing.push(p);
-    
-    if (executing.length >= limit) {
-      await Promise.race(executing);
-      // Remove the resolved promise(s)
-      for (let i = executing.length - 1; i >= 0; i--) {
-        // Unfortunately standard Promise doesn't expose state, 
-        // but since we await Promise.race, at least one is done.
-        // A simple chunking is actually safer and easier:
-      }
-    }
-  }
-  await Promise.all(executing);
-  return results;
-}
-
-// Uma versão em lotes (chunking) é mais simples e segura
-async function fetchInChunks<T, R>(items: T[], chunkSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = [];
-  for (let i = 0; i < items.length; i += chunkSize) {
-    const chunk = items.slice(i, i + chunkSize);
-    const chunkResults = await Promise.all(chunk.map(fn));
-    results.push(...chunkResults);
-  }
-  return results;
-}
-
-const getLinkedHashes = unstable_cache(
-  async (hash: string) => {
-    try {
-      const liveData = await obterDetalheInterno(hash);
-      return liveData?.processos_vinculados_hashes || [];
-    } catch (err) {
-      return [];
-    }
-  },
-  ["processos-vinculados-hashes"], // O unstable_cache usa esse prefixo + os argumentos fornecidos (no caso o hash)
-  { revalidate: 86400 * 3, tags: ["processos"] } // 3 dias de TTL
-);
-
-const getProcessoMetadata = unstable_cache(
-  async (hash: string) => {
-    try {
-      const liveData = await obterDetalheInterno(hash);
-      if (!liveData) return null;
-      return {
-        hash: liveData.hash,
-        num_formatado: liveData.num_formatado,
-        assunto: liveData.assunto,
-        situacao_atual_str: liveData.situacao_atual_str
-      };
-    } catch (err) {
-      return null;
-    }
-  },
-  ["processo-vinculado-metadata"], // O unstable_cache usa esse prefixo + os argumentos fornecidos (no caso o hash)
-  { revalidate: 86400, tags: ["processos"] } // 1 dia de TTL
-);
 
 function SubprocessosBlock({ subprocessos, vinculadosHtml }: { subprocessos: any[], vinculadosHtml?: any[] }) {
   const hasSub = subprocessos && subprocessos.length > 0;
@@ -278,16 +204,31 @@ export default async function DetalhesProcesso({
     if (parent) parentHash = parent.hash;
   }
 
-  // Phase 1: Extração defensiva e Controle de Concorrência
+  // Extração defensiva de processos vinculados no HTML das movimentações
   let vinculadosHtml: any[] = [];
   if (ASSUNTOS_TERCEIRO_SETOR.has(p.id_assunto) || ASSUNTOS_SAUDE.has(p.id_assunto)) {
-    const extractedHashes = await getLinkedHashes(hash);
-    if (extractedHashes && extractedHashes.length > 0) {
-      // Limitando a concorrência (chunking de 3 em 3) para evitar rate limits na Vercel / 1Doc
-      const metadataResults = await fetchInChunks(extractedHashes, 3, async (h) => {
-        return await getProcessoMetadata(h);
-      });
-      vinculadosHtml = metadataResults.filter(Boolean);
+    const hashesEncontrados = new Set<string>();
+    movimentacoes.forEach((mov: any) => {
+      if (mov.conteudo) {
+        extractVinculadosHashesFromHtml(mov.conteudo).forEach((h) => hashesEncontrados.add(h));
+      }
+    });
+
+    const extractedHashes = Array.from(hashesEncontrados);
+    
+    if (extractedHashes.length > 0) {
+      // Agora consultamos diretamente no Banco de Dados (muito mais rápido, gerido pelo Cron)
+      const { data: dbVinculados } = await supabaseAdmin
+        .from("processos_emendas")
+        .select("hash, num_formatado, num, ano, assunto, situacao_atual")
+        .in("hash", extractedHashes);
+
+      if (dbVinculados) {
+        vinculadosHtml = dbVinculados.map(v => ({
+          ...v,
+          situacao_atual_str: v.situacao_atual // Normaliza para o componente
+        }));
+      }
     }
   }
   return (

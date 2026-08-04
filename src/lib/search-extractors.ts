@@ -38,27 +38,19 @@ export function extractSearchAutores(
 ): string {
   if (!Array.isArray(formData)) return "";
 
-  // 1. Tenta via form_data (Saúde e formulários com campo explícito de autor)
-  const autoresForm = formData
-    .filter((f: any) => {
-      const norm = normalizeLabel(f.label || "");
-      return norm.includes("vereador autor") || norm.includes("parlamentar autor");
-    })
-    .map((f: any) => f.valor as string)
-    .filter(Boolean);
-
-  if (autoresForm.length > 0) {
-    return removeAcentos(autoresForm.join(", "));
-  }
-
-  // 2. Fallback: extrai via buildRateioTable (Terceiro Setor com texto livre)
+  // 1. A função buildRateioTable já tem a inteligência de unir o Autor Principal (do form_data)
+  // com os Autores Secundários (extraídos do texto livre via regex), sem duplicatas.
   const rateios = buildRateioTable(formData, conteudoSemHtml);
   if (rateios.length > 0) {
     return removeAcentos(rateios.map((r) => r.autor).join(", "));
   }
 
-  // 3. Fallback final: tenta pegar do campo genérico "autor"
-  const autorGenerico = extractFromForm(formData, "autor");
+  // 2. Fallback final: tenta pegar do campo genérico "autor" ou form explícito caso a regex tenha falhado
+  const autorGenerico = 
+    extractFromForm(formData, "vereador autor") ||
+    extractFromForm(formData, "parlamentar autor") ||
+    extractFromForm(formData, "autor");
+    
   if (autorGenerico) return removeAcentos(autorGenerico);
 
   return "";

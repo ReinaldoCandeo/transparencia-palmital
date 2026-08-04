@@ -47,6 +47,7 @@ export const processoEmendaSchema = z.object({
       data: z.string(),
       hora: z.string(),
       origem_setor: z.string(),
+      conteudo: z.string().optional(),
       anexos: z.array(
         z.object({
           id_externo: z.string().optional(),
