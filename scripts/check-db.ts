@@ -1,14 +1,1 @@
-import { config } from "dotenv";
-config({ path: ".env.local" });
-import { supabaseAdmin } from "../src/lib/db-admin";
-
-async function check() {
-  const { data, error } = await supabaseAdmin.from("processos_emendas").select("num_formatado, assunto, data, hash, emenda_valor_formatado, social_valor_total");
-  if (error) {
-    console.error("Erro:", error);
-    return;
-  }
-  console.log(`Encontrados ${data.length} processos no banco de dados!`);
-  console.table(data);
-}
-check();
+import { createClient } from '@supabase/supabase-js'; import { config } from 'dotenv'; config({ path: '.env.local' }); const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY); async function run() { const { data } = await supabase.from('processos_emendas').select('movimentacoes').limit(1); console.log(JSON.stringify(data?.[0]?.movimentacoes?.[0])); } run();

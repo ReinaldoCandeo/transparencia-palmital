@@ -112,3 +112,30 @@ export function extractSearchCategoria(idAssunto: number): string {
   };
   return MAP[idAssunto] ?? "outros";
 }
+
+/**
+ * Extrai o ano da emenda do formulário ou do texto livre.
+ * Procura por "Exercício", "Ano" ou "Ano da Emenda" no form_data.
+ * Fallback para o texto livre se necessário.
+ */
+export function extractAnoEmenda(formData: any[], conteudoSemHtml?: string): number | null {
+  if (Array.isArray(formData)) {
+    const item = formData.find((f: any) => {
+      const norm = normalizeLabel(f.label || "");
+      return norm.includes("exercicio") || norm === "ano" || norm.includes("ano da emenda");
+    });
+    if (item?.valor) {
+      const match = item.valor.match(/\b(20\d{2})\b/);
+      if (match) return parseInt(match[1], 10);
+    }
+  }
+
+  if (conteudoSemHtml) {
+    const match = conteudoSemHtml.match(/\b(?:exerc[ií]cio|ano)(?:\s+de)?\s*(20\d{2})\b/i);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+
+  return null;
+}

@@ -14,6 +14,7 @@ interface OnedocMovimentacao {
   origem_id_usuario: string;
   origem_usuario: string; // recebido, mas omitido na saída pública (LGPD)
   anexos?: OnedocAnexo[];
+  conteudo?: string;
 }
 
 interface OnedocAnexo {
@@ -83,6 +84,7 @@ export interface MovimentacaoPublica {
   hora: string;
   origem_setor: string;
   anexos?: AnexoPublico[];
+  conteudo?: string;
 }
 
 export interface AnexoPublico {
@@ -115,6 +117,7 @@ export interface ProcessoPublico {
   // JSONB flexível para formulários
   form_data: { label: string; valor: string; tipo?: string }[];
   conteudo?: string;
+  processos_vinculados_hashes: string[]; // Hashes extraídos via HTML
 }
 
 // ─── Configuração ──────────────────────────────────────────────────────────
@@ -298,15 +301,40 @@ export const ASSUNTOS_EMENDA = new Set([
 ]);
 
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
+  const processos_vinculados_hashes: string[] = [];
+  try {
+    if (p.movimentacoes) {
+      for (const mov of p.movimentacoes) {
+        const conteudoHtml = mov.conteudo;
+        if (conteudoHtml) {
+          // 1. Isola todas as tags <a>
+          const aTags = conteudoHtml.match(/<a\s[^>]+>/gi) || [];
+          for (const aTag of aTags) {
+            // 2. Verifica se é um vínculo (tipo 2 ou classe mention_2)
+            if (aTag.includes('data-tipo="2"') || aTag.includes('mention_2')) {
+              // 3. Extrai o hash de forma agnóstica à ordem dos atributos
+              const hashMatch = aTag.match(/hash=([a-zA-Z0-9]+)/i);
+              if (hashMatch && hashMatch[1]) {
+                processos_vinculados_hashes.push(hashMatch[1]);
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[1Doc] Erro silencioso na extração de vínculos HTML:", err);
+  }
+
+  // Remove hashes duplicados
+  const hashesUnicos = Array.from(new Set(processos_vinculados_hashes));
+
   return {
     id_emissao: p.id_emissao || "",
     id_emissao_base: p.id_emissao_base || undefined,
     hash: p.hash,
     num: String(p.num),
     ano: String(p.ano),
-    // Bug da 1Doc: o endpoint /despachos retorna num_formatado vazio.
-    // Fallback: constrói o formato brasileiro a partir de num + ano.
-    // Ex: num=2663, ano=2026 → "2.663/2026"
     num_formatado: p.num_formatado || `${p.num.toLocaleString("pt-BR")}/${p.ano}`,
     id_assunto: p.id_assunto,
     assunto: stripHtml(p.assunto ?? ""),
@@ -328,6 +356,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
         data: m.data,
         hora: m.hora,
         origem_setor: m.origem_setor ?? "",
+        conteudo: m.conteudo ? cleanHtml(m.conteudo) : undefined,
         anexos: (m.anexos ?? []).map((a: any) => {
           const partes = a.arquivo.split(".");
           const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
@@ -353,6 +382,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
         _url_original: a.url_original,
       };
     }),
+    processos_vinculados_hashes: hashesUnicos,
   };
 }
 

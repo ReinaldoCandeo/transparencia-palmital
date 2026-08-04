@@ -16,6 +16,7 @@ import {
   extractSearchAutores,
   extractSearchEsfera,
   extractSearchCategoria,
+  extractAnoEmenda,
 } from "../src/lib/search-extractors";
 
 const supabase = createClient(
@@ -53,6 +54,7 @@ async function backfill() {
       search_esfera: extractSearchEsfera(formData) || null,
       search_categoria: extractSearchCategoria(p.id_assunto),
       search_ano: anoNum && !isNaN(anoNum) ? anoNum : null,
+      ano_emenda_ext: extractAnoEmenda(formData, conteudoSemHtml) || null,
     };
 
     process.stdout.write(

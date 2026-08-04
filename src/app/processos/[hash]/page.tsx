@@ -21,13 +21,14 @@ import {
 } from "lucide-react";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { supabase } from "@/lib/db-client";
-import { StatusBadge } from "@/components/portal/BuscaProcessosClient";
+import { StatusBadge } from "@/components/portal/StatusBadge";
 import { after } from "next/server";
 import { EmendaSaudeBlock, EmendaTerceiroSetorBlock, EmendaMunicipalBlock } from "@/components/portal/EmendaBlocks";
 import { ASSUNTOS_SAUDE, ASSUNTOS_TERCEIRO_SETOR } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
 import { flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
+import { NOMENCLATURA } from "@/lib/constants";
 
 function formatDateBR(dataStr: string, horaStr?: string) {
   if (!dataStr) return "";
@@ -68,25 +69,130 @@ function InfoField({
 
 
 
-function SubprocessosBlock({ subprocessos }: { subprocessos: any[] }) {
-  if (!subprocessos || subprocessos.length === 0) return null;
+import { obterDetalheInterno } from "@/lib/onedoc";
+import { unstable_cache } from "next/cache";
+
+// ─── Phase 1: Extração defensiva e Controle de Concorrência ────────────────
+// Helper de concorrência para evitar rate limits
+async function fetchWithConcurrencyLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  const executing: Promise<void>[] = [];
+  
+  for (const item of items) {
+    const p = fn(item).then(res => {
+      results.push(res);
+    });
+    executing.push(p);
+    
+    if (executing.length >= limit) {
+      await Promise.race(executing);
+      // Remove the resolved promise(s)
+      for (let i = executing.length - 1; i >= 0; i--) {
+        // Unfortunately standard Promise doesn't expose state, 
+        // but since we await Promise.race, at least one is done.
+        // A simple chunking is actually safer and easier:
+      }
+    }
+  }
+  await Promise.all(executing);
+  return results;
+}
+
+// Uma versão em lotes (chunking) é mais simples e segura
+async function fetchInChunks<T, R>(items: T[], chunkSize: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(fn));
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
+const getLinkedHashes = unstable_cache(
+  async (hash: string) => {
+    try {
+      const liveData = await obterDetalheInterno(hash);
+      return liveData?.processos_vinculados_hashes || [];
+    } catch (err) {
+      return [];
+    }
+  },
+  ["processos-vinculados-hashes"], // O unstable_cache usa esse prefixo + os argumentos fornecidos (no caso o hash)
+  { revalidate: 86400 * 3, tags: ["processos"] } // 3 dias de TTL
+);
+
+const getProcessoMetadata = unstable_cache(
+  async (hash: string) => {
+    try {
+      const liveData = await obterDetalheInterno(hash);
+      if (!liveData) return null;
+      return {
+        hash: liveData.hash,
+        num_formatado: liveData.num_formatado,
+        assunto: liveData.assunto,
+        situacao_atual_str: liveData.situacao_atual_str
+      };
+    } catch (err) {
+      return null;
+    }
+  },
+  ["processo-vinculado-metadata"], // O unstable_cache usa esse prefixo + os argumentos fornecidos (no caso o hash)
+  { revalidate: 86400, tags: ["processos"] } // 1 dia de TTL
+);
+
+function SubprocessosBlock({ subprocessos, vinculadosHtml }: { subprocessos: any[], vinculadosHtml?: any[] }) {
+  const hasSub = subprocessos && subprocessos.length > 0;
+  const hasVinc = vinculadosHtml && vinculadosHtml.length > 0;
+  
+  if (!hasSub && !hasVinc) return null;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
       <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground mb-4">
-        <LayoutGrid className="h-5 w-5 text-muted-foreground" /> Processos Vinculados (Subprocessos)
+        <LayoutGrid className="h-5 w-5 text-muted-foreground" /> Processos Vinculados (Execução Financeira)
       </h3>
       <div className="grid gap-3">
-        {subprocessos.map((sub: any, i: number) => (
-          <div key={i} className="flex flex-col rounded-lg border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+        {hasSub && subprocessos.map((sub: any, i: number) => (
+          <div key={`sub-${i}`} className="flex flex-col rounded-lg border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-mono text-sm font-bold text-foreground">
-                Autuação nº {sub.num_formatado || `${sub.num}/${sub.ano}`}
+                {NOMENCLATURA.PROCESSO} nº {sub.num_formatado || `${sub.num}/${sub.ano}`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">{sub.assunto}</p>
+              {sub.situacao_atual && (
+                <div className="mt-2 inline-flex">
+                   <StatusBadge status={sub.situacao_atual} />
+                </div>
+              )}
             </div>
             <Link 
               href={`/processos/${sub.hash}`}
+              className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:mt-0"
+            >
+              Ver Detalhes
+            </Link>
+          </div>
+        ))}
+        {hasVinc && vinculadosHtml.map((vinc: any, i: number) => (
+          <div key={`vinc-${i}`} className="flex flex-col rounded-lg border border-border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-mono text-sm font-bold text-foreground">
+                {NOMENCLATURA.PROCESSO} nº {vinc.num_formatado}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{vinc.assunto}</p>
+              {vinc.situacao_atual_str && (
+                <div className="mt-2 inline-flex">
+                   <StatusBadge status={vinc.situacao_atual_str} />
+                </div>
+              )}
+            </div>
+            <Link 
+              href={`/processos/${vinc.hash}`}
               className="mt-3 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:mt-0"
             >
               Ver Detalhes
@@ -172,8 +278,18 @@ export default async function DetalhesProcesso({
     if (parent) parentHash = parent.hash;
   }
 
-
-
+  // Phase 1: Extração defensiva e Controle de Concorrência
+  let vinculadosHtml: any[] = [];
+  if (ASSUNTOS_TERCEIRO_SETOR.has(p.id_assunto) || ASSUNTOS_SAUDE.has(p.id_assunto)) {
+    const extractedHashes = await getLinkedHashes(hash);
+    if (extractedHashes && extractedHashes.length > 0) {
+      // Limitando a concorrência (chunking de 3 em 3) para evitar rate limits na Vercel / 1Doc
+      const metadataResults = await fetchInChunks(extractedHashes, 3, async (h) => {
+        return await getProcessoMetadata(h);
+      });
+      vinculadosHtml = metadataResults.filter(Boolean);
+    }
+  }
   return (
     <PortalLayout>
       <div className="bg-muted/30">
@@ -200,7 +316,7 @@ export default async function DetalhesProcesso({
               <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <h1 className="font-mono text-2xl font-bold text-foreground sm:text-3xl">
-                    Autuação nº {p.num_formatado || `${p.num}/${p.ano}`}
+                    {NOMENCLATURA.PROCESSO} nº {p.num_formatado || `${p.num}/${p.ano}`}
                   </h1>
                   <p className="mt-2 text-lg font-medium text-muted-foreground">
                     {p.assunto}
@@ -209,7 +325,7 @@ export default async function DetalhesProcesso({
                 <StatusBadge status={p.situacao_atual || "Indefinida"} />
               </div>
 
-              <div className="mt-8 grid gap-6 rounded-xl bg-muted/40 p-5 sm:grid-cols-2 md:grid-cols-3">
+              <dl className="mt-8 grid gap-6 rounded-xl bg-muted/40 p-5 sm:grid-cols-2 md:grid-cols-3">
                 <div>
                   <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <Calendar className="h-4 w-4" /> Data de abertura
@@ -234,7 +350,7 @@ export default async function DetalhesProcesso({
                     {p.destino_setor}
                   </dd>
                 </div>
-              </div>
+              </dl>
             </div>
 
             {/* Formulário Dinâmico da Emenda com Blocos Especializados */}
@@ -256,8 +372,8 @@ export default async function DetalhesProcesso({
               </>
             )}
 
-            {/* Bloco de Subprocessos */}
-            <SubprocessosBlock subprocessos={subprocessos || []} />
+            {/* Bloco de Subprocessos e Vinculados HTML */}
+            <SubprocessosBlock subprocessos={subprocessos || []} vinculadosHtml={vinculadosHtml} />
 
             {/* Documentos Anexados */}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
