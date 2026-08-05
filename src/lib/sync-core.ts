@@ -33,6 +33,13 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
     detalheCompleto.id_emissao_base = forceIdEmissaoBase;
   }
 
+  // 2. Traz estado atual no DB para comparar o que já temos em anexo (e validar se já existe)
+  const { data: dbData } = await supabaseAdmin
+    .from("processos_emendas")
+    .select("anexos, movimentacoes")
+    .eq("hash", hash)
+    .single();
+
   if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto)) {
     isEmendaOuSubprocesso = true;
   } else if (detalheCompleto.id_emissao_base) {
@@ -49,31 +56,30 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
     }
   }
 
+  // Bypass adicional: Se o processo já está na nossa base, ele deve ser sincronizado (pode ser um resync de um processo legado)
+  if (dbData) {
+    console.log(`[CORE] Bypass Autorizado: Processo ${hash} já existe no banco local.`);
+    isEmendaOuSubprocesso = true;
+  }
+
   if (!isEmendaOuSubprocesso) {
     console.log(`[CORE] Processo ${hash} rejeitado: Não é Emenda nem Subprocesso válido.`);
     return null;
   }
   // ------------------------------------------------------
 
-  // 2. Traz estado atual no DB para comparar o que já temos em anexo
-  const { data: dbData } = await supabaseAdmin
-    .from("processos_emendas")
-    .select("anexos, movimentacoes")
-    .eq("hash", hash)
-    .single();
-
   const existingUrls = new Map<string, string>();
   if (dbData) {
     if (Array.isArray(dbData.anexos)) {
       dbData.anexos.forEach((a: any) => {
-        if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage);
+        if (a._url_original && a.url_storage) existingUrls.set(a._url_original, a.url_storage);
       });
     }
     if (Array.isArray(dbData.movimentacoes)) {
       dbData.movimentacoes.forEach((m: any) => {
         if (Array.isArray(m.anexos)) {
           m.anexos.forEach((a: any) => {
-            if (a.arquivo && a.url_storage) existingUrls.set(a.arquivo, a.url_storage);
+            if (a._url_original && a.url_storage) existingUrls.set(a._url_original, a.url_storage);
           });
         }
       });
@@ -88,8 +94,8 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
       if (!a._url_original) continue;
       
       // Cache
-      if (existingUrls.has(a.arquivo)) {
-        a.url_storage = existingUrls.get(a.arquivo);
+      if (existingUrls.has(a._url_original)) {
+        a.url_storage = existingUrls.get(a._url_original);
         continue;
       }
       
@@ -102,7 +108,7 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
         break;
       }
 
-      a.url_storage = await syncAnexoStorage(hash, a._url_original, a.arquivo);
+      a.url_storage = await syncAnexoStorage(hash, a._url_original, a.arquivo, a.id_externo);
     }
   };
 

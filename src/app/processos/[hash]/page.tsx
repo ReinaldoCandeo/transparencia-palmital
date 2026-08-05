@@ -183,8 +183,40 @@ export default async function DetalhesProcesso({
   }
 
   // Fallback seguro para arrays (JSONB)
-  const movimentacoes = Array.isArray(p.movimentacoes) ? p.movimentacoes : [];
-  const anexos = Array.isArray(p.anexos) ? p.anexos : [];
+  let movimentacoes = Array.isArray(p.movimentacoes) ? [...p.movimentacoes] : [];
+  
+  // Deduplicar movimentações por ID para evitar itens duplicados na linha do tempo
+  const seenMovs = new Set();
+  movimentacoes = movimentacoes.filter(m => {
+    if (!m.id) return true;
+    if (seenMovs.has(m.id)) return false;
+    seenMovs.add(m.id);
+    return true;
+  });
+
+  // Ordenar por data e hora decrescente (mais recentes no topo)
+  movimentacoes.sort((a, b) => {
+    // A API 1Doc fornece: data "YYYY-MM-DD" e hora "HH:MM:SS" (ou "HH:MM")
+    const timeA = new Date(`${a.data}T${a.hora || '00:00:00'}`).getTime();
+    const timeB = new Date(`${b.data}T${b.hora || '00:00:00'}`).getTime();
+    
+    // Se as datas forem inválidas (NaN), mantém a ordem original
+    if (isNaN(timeA) || isNaN(timeB)) return 0;
+    
+    return timeA - timeB;
+  });
+
+  let anexos = Array.isArray(p.anexos) ? [...p.anexos] : [];
+  
+  // Deduplicar anexos principais pelo nome do arquivo
+  const seenAnexos = new Set();
+  anexos = anexos.filter(a => {
+    const key = a._url_original || a.url_storage || a.arquivo;
+    if (!key) return true;
+    if (seenAnexos.has(key)) return false;
+    seenAnexos.add(key);
+    return true;
+  });
 
   // Buscar subprocessos (onde id_emissao_base == p.id_emissao)
   const { data: subprocessos } = await supabase
@@ -338,8 +370,8 @@ export default async function DetalhesProcesso({
                         <FileText className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {doc.arquivo}
+                        <p className="truncate text-sm font-medium text-foreground" title={doc.arquivo.replace(/^\d+_/, "")}>
+                          {doc.arquivo.replace(/^\d+_/, "")}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {doc.extensao?.toUpperCase()} •{" "}
@@ -426,8 +458,8 @@ export default async function DetalhesProcesso({
                                     <>
                                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                                       <div className="min-w-0 flex-1">
-                                        <p className="truncate text-xs font-medium text-foreground">
-                                          {anexo.arquivo}
+                                        <p className="truncate text-sm font-medium text-foreground" title={anexo.arquivo.replace(/^\d+_/, "")}>
+                                          {anexo.arquivo.replace(/^\d+_/, "")}
                                         </p>
                                         <p className="text-[10px] text-muted-foreground">
                                           {anexo.extensao?.toUpperCase()} • {anexo.tamanho_bytes > 0 ? `${(anexo.tamanho_bytes / 1024).toFixed(0)} KB` : anexo.tipo_mime}
