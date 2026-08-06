@@ -25,6 +25,12 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
     return null;
   }
 
+  const CUTOFF_DATE = new Date("2026-07-01T00:00:00Z");
+  if (new Date(detalheCompleto.data) < CUTOFF_DATE) {
+    console.log(`[CORE] Processo ${hash} ignorado: Data de emissão (${detalheCompleto.data}) é anterior ao limite (01/07/2026).`);
+    return null;
+  }
+
   // --- GATEKEEPER (Bypass Dinâmico para Subprocessos) ---
   let isEmendaOuSubprocesso = false;
 
