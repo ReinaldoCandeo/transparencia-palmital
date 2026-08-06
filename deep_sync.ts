@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 import { obterProcessosPaginadoInterno } from './src/lib/onedoc';
 import { syncProcessByHash } from './src/lib/sync-core';
 import { extractSearchCategoria } from './src/lib/search-extractors';
@@ -24,15 +24,21 @@ async function run() {
   while (page <= totalPaginas) {
     console.log(`Buscando pagina ${page}...`);
     const result = await obterProcessosPaginadoInterno(page);
-    totalPaginas = result.totalPaginas;
+    if (result.totalPaginas > 1) {
+      totalPaginas = result.totalPaginas;
+    }
 
     const processos = result.processos;
-    if (!processos || processos.length === 0) break;
+    if (!processos) {
+      page++;
+      continue;
+    }
 
     for (const p of processos) {
       if (!hashesExistentes.has(p.hash)) {
         console.log(`[DEEP SYNC] Sincronizando novo processo encontrado: ${p.hash} (Assunto: ${p.id_assunto})`);
-        const novo = await syncProcessByHash(p.hash, 50000);
+        const resultSync = await syncProcessByHash(p.hash, 50000);
+        const novo = resultSync?.data;
         if (novo) {
           hashesExistentes.add(novo.hash);
           
@@ -46,8 +52,8 @@ async function run() {
     page++;
     
     // Safety limit to avoid infinite loops, adjust if necessary
-    if (page > 30) {
-      console.log("Reached page 30, stopping to avoid too long execution.");
+    if (page > 200) {
+      console.log("Reached page 200, stopping to avoid too long execution.");
       break;
     }
   }
