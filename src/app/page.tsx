@@ -39,16 +39,25 @@ export default async function PaginaBuscaProcessos({
     typeof params.cnpj === "string" ? params.cnpj.trim() : undefined;
   const cnpj = cnpjBruto ? cnpjBruto.replace(/[.\-\/]/g, "") : undefined;
 
+  // 🔒 BLINDAGEM 5: Paginação segura
+  const pageParam = parseInt(params.page as string, 10);
+  const page = !isNaN(pageParam) && pageParam > 0 ? pageParam : 1;
+  const limit = 20;
+  const start = (page - 1) * limit;
+  const end = start + limit - 1;
+
   // Monta a query de forma incremental — cada filtro só é aplicado se existir
   // Seleciona apenas as colunas necessárias para a listagem (sem form_data / movimentacoes / anexos)
   let query = supabase
     .from("processos_emendas")
     .select(
-      "hash, num, ano, num_formatado, assunto, data, hora, origem_setor, situacao_atual, search_autores, search_categoria, search_esfera, search_ano, search_entidade, search_cnpj, form_data"
+      "hash, num, ano, num_formatado, assunto, data, hora, origem_setor, situacao_atual, search_autores, search_categoria, search_esfera, search_ano, search_entidade, search_cnpj, form_data",
+      { count: "exact" }
     )
     .is("id_emissao_base", null)
     .order("data", { ascending: false })
-    .order("hora", { ascending: false });
+    .order("hora", { ascending: false })
+    .range(start, end);
 
   if (ano) query = query.eq("search_ano", ano);
   if (categoria) query = query.eq("search_categoria", categoria);
@@ -66,11 +75,13 @@ export default async function PaginaBuscaProcessos({
   // CNPJ: busca por substring usando ilike + índice pg_trgm (sem curingas no B-Tree)
   if (cnpj) query = query.ilike("search_cnpj", `%${cnpj}%`);
 
-  const { data: processos, error } = await query;
+  const { data: processos, count, error } = await query;
 
   if (error) {
     console.error("[SSR] Erro ao buscar processos do Supabase:", error);
   }
+
+  const totalPaginas = count ? Math.ceil(count / limit) : 1;
 
   // Filtros ativos passados para o Client Component (para inicializar os selects corretamente)
   const filtrosAtivos = {
@@ -85,8 +96,8 @@ export default async function PaginaBuscaProcessos({
   return (
     <BuscaProcessosClient
       processos={(processos as ProcessoEmendaRow[]) || []}
-      paginaAtual={1}
-      totalPaginas={1}
+      paginaAtual={page}
+      totalPaginas={totalPaginas}
       filtrosAtivos={filtrosAtivos}
     />
   );
