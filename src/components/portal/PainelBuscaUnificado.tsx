@@ -60,7 +60,7 @@ export function PainelBuscaUnificado({
     } else {
       params.delete(chave);
     }
-    params.delete("pagina");
+    params.delete("page");
     
     // CORREÇÃO UX: { scroll: false } impede que a tela pule para o topo ao filtrar
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
@@ -287,7 +287,6 @@ function FiltroTextInput({
     </label>
   );
 }
-// ─── Sub-componentes ──────────────────────────────────────────────────────────
 
 function FiltroSelect({
   label,
@@ -301,7 +300,10 @@ function FiltroSelect({
   options: { value: string; label: string }[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLLabelElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -309,59 +311,125 @@ function FiltroSelect({
         setIsOpen(false);
       }
     };
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
     if (isOpen) {
       document.addEventListener("mousedown", handleOutsideClick);
-      document.addEventListener("keydown", handleEsc);
     }
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-      document.removeEventListener("keydown", handleEsc);
-    };
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const idx = options.findIndex((o) => o.value === value);
+      setActiveIndex(idx >= 0 ? idx : 0);
+    } else {
+      setActiveIndex(-1);
+    }
+  }, [isOpen, value, options]);
+
+  useEffect(() => {
+    if (isOpen && activeIndex >= 0 && listRef.current) {
+      const activeItem = listRef.current.children[activeIndex] as HTMLElement;
+      if (activeItem) {
+        activeItem.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [activeIndex, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+      } else {
+        setActiveIndex((prev) => (prev + 1) % options.length);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+      } else {
+        setActiveIndex((prev) => (prev - 1 + options.length) % options.length);
+      }
+    } else if (e.key === "Enter" || e.key === " ") {
+      if (isOpen && activeIndex >= 0) {
+        e.preventDefault();
+        onChange(options[activeIndex].value);
+        setIsOpen(false);
+        buttonRef.current?.focus();
+      } else if (!isOpen && e.key === " ") {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+    } else if (e.key === "Escape") {
+      if (isOpen) {
+        e.preventDefault();
+        setIsOpen(false);
+        buttonRef.current?.focus();
+      }
+    }
+  };
 
   const selectedOption = options.find((o) => o.value === value) || options[0];
 
   return (
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-foreground w-full relative" ref={containerRef}>
+    <label
+      className="flex flex-col gap-1.5 text-xs font-medium text-foreground w-full relative"
+      ref={containerRef}
+    >
       {label}
       <button
+        ref={buttonRef}
         type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label={label}
         onClick={() => setIsOpen((prev) => !prev)}
+        onKeyDown={handleKeyDown}
         className="relative w-full flex items-center justify-between rounded-md border border-input bg-background py-2 pl-3 pr-8 text-sm text-foreground shadow-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary hover:border-primary/50 transition-colors"
       >
         <span className="truncate block">{selectedOption.label}</span>
         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted-foreground">
-          <ChevronDown className={`h-4 w-4 opacity-70 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          <ChevronDown
+            className={`h-4 w-4 opacity-70 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          />
         </div>
       </button>
 
       {isOpen && (
         <div className="absolute top-[100%] left-0 w-full mt-1 z-50 rounded-md border border-input bg-card shadow-lg ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 overflow-hidden">
-          <ul className="max-h-60 overflow-auto p-1">
-            {options.map((o) => (
-              <li key={o.value}>
-                <button
-                  type="button"
+          <ul
+            ref={listRef}
+            role="listbox"
+            tabIndex={-1}
+            aria-activedescendant={`option-${activeIndex}`}
+            className="max-h-60 overflow-auto p-1 focus:outline-none"
+          >
+            {options.map((o, index) => {
+              const isActive = index === activeIndex;
+              const isSelected = o.value === value;
+              return (
+                <li
+                  key={o.value}
+                  id={`option-${index}`}
+                  role="option"
+                  aria-selected={isSelected}
                   onClick={() => {
                     onChange(o.value);
                     setIsOpen(false);
+                    buttonRef.current?.focus();
                   }}
-                  className={`w-full text-left rounded-sm px-2 py-1.5 text-sm transition-colors flex items-center ${
-                    o.value === value
-                      ? "bg-primary/10 text-primary font-medium"
+                  className={`w-full text-left rounded-sm px-2 py-1.5 text-sm transition-colors flex items-center cursor-pointer ${
+                    isActive ? "bg-primary/20 outline-none" : ""
+                  } ${
+                    isSelected
+                      ? "text-primary font-medium"
                       : "text-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <span className="truncate">{o.label}</span>
-                </button>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
