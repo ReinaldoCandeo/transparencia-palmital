@@ -73,11 +73,13 @@ export default function BuscaProcessosClient({
   processos,
   paginaAtual,
   totalPaginas,
+  totalProcessos,
   filtrosAtivos,
 }: {
   processos: ProcessoEmendaRow[];
   paginaAtual: number;
   totalPaginas: number;
+  totalProcessos: number;
   filtrosAtivos: FiltrosAtivos;
 }) {
   const router = useRouter();
@@ -125,7 +127,7 @@ export default function BuscaProcessosClient({
               Listagem Geral (Últimos Processos)
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {processos.length} processo{processos.length !== 1 ? "s" : ""} encontrado{processos.length !== 1 ? "s" : ""}
+              {totalProcessos} processo{totalProcessos !== 1 ? "s" : ""} encontrado{totalProcessos !== 1 ? "s" : ""}
             </p>
           </div>
         </div>

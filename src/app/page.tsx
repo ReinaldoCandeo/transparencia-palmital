@@ -98,6 +98,7 @@ export default async function PaginaBuscaProcessos({
       processos={(processos as ProcessoEmendaRow[]) || []}
       paginaAtual={page}
       totalPaginas={totalPaginas}
+      totalProcessos={count || 0}
       filtrosAtivos={filtrosAtivos}
     />
   );
