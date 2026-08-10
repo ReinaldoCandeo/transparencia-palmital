@@ -5,6 +5,8 @@ import {
   extractSearchEsfera,
   extractSearchCategoria,
   extractAnoEmenda,
+  extractSearchEntidade,
+  extractSearchCnpj,
 } from "@/lib/search-extractors";
 
 /**
@@ -77,6 +79,8 @@ export const processoEmendaSchema = z.object({
   search_categoria: z.string().nullable().optional(),
   search_ano:       z.number().int().nullable().optional(),
   ano_emenda_ext:   z.number().int().nullable().optional(),
+  search_entidade:  z.string().nullable().optional(),
+  search_cnpj:      z.string().nullable().optional(),
 });
 
 // Tipagem inferida para uso no TypeScript
@@ -104,6 +108,8 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
     search_categoria: extractSearchCategoria(p.id_assunto) || null,
     search_ano:       !isNaN(anoNum as number) ? anoNum : null,
     ano_emenda_ext:   extractAnoEmenda(formData, conteudoSemHtml) || null,
+    search_entidade:  extractSearchEntidade(formData, p.assunto) || null,
+    search_cnpj:      extractSearchCnpj(formData) || null,
   };
 
   const { situacao_atual_str, form_data: _form, ...rowLimpa } = row as any;

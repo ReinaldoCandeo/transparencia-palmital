@@ -131,3 +131,51 @@ export function extractAnoEmenda(formData: any[], conteudoSemHtml?: string): num
 
   return null;
 }
+
+/**
+ * Extrai o nome da Entidade Beneficiária do form_data.
+ * Tenta labels conhecidos em ordem de prioridade e, como fallback,
+ * usa o último segmento do campo assunto (padrão antigo do 1Doc).
+ * String salva sem acentos e lowercase para compatibilidade com textSearch.
+ */
+export function extractSearchEntidade(
+  formData: any[],
+  assunto?: string | null
+): string {
+  if (Array.isArray(formData)) {
+    const nome =
+      extractFromForm(formData, "razao social") ||
+      extractFromForm(formData, "beneficiaria") ||
+      extractFromForm(formData, "entidade");
+    if (nome) return removeAcentos(nome);
+  }
+
+  // Fallback: última parte do assunto separado por " - ", se parecer um nome
+  if (assunto && assunto.includes(" - ")) {
+    const parts = assunto.split(" - ");
+    const last = parts[parts.length - 1].trim();
+    if (last.length > 5) return removeAcentos(last);
+  }
+
+  return "";
+}
+
+/**
+ * Extrai o CNPJ da Entidade Beneficiária do form_data.
+ * Armazenado como string SOMENTE DE DÍGITOS (ex: "44543981000199")
+ * para suportar busca por substring via ilike + índice pg_trgm,
+ * sem dependência de formatação do usuário.
+ */
+export function extractSearchCnpj(formData: any[]): string {
+  if (!Array.isArray(formData)) return "";
+
+  const cnpj =
+    extractFromForm(formData, "cnpj da unidade") ||
+    extractFromForm(formData, "cnpj benefici") ||
+    extractFromForm(formData, "cnpj");
+
+  if (!cnpj) return "";
+
+  // Remove formatação: "44.543.981/0001-99" → "44543981000199"
+  return cnpj.replace(/[.\-\/]/g, "").trim();
+}

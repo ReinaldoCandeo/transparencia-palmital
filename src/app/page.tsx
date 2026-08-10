@@ -28,12 +28,23 @@ export default async function PaginaBuscaProcessos({
     typeof params.autor === "string" ? params.autor.trim() : undefined;
   const autor = autorBruto ? removeAcentos(autorBruto) : undefined;
 
+  // 🔒 BLINDAGEM 3: Entidade — normaliza para corresponder ao formato salvo (sem acentos, lowercase).
+  const entidadeBruta =
+    typeof params.entidade === "string" ? params.entidade.trim() : undefined;
+  const entidade = entidadeBruta ? removeAcentos(entidadeBruta) : undefined;
+
+  // 🔒 BLINDAGEM 4: CNPJ — remove qualquer formatacão antes de buscar.
+  // A URL chega limpa (somente dígitos), mas sanitizamos por garantia.
+  const cnpjBruto =
+    typeof params.cnpj === "string" ? params.cnpj.trim() : undefined;
+  const cnpj = cnpjBruto ? cnpjBruto.replace(/[.\-\/]/g, "") : undefined;
+
   // Monta a query de forma incremental — cada filtro só é aplicado se existir
   // Seleciona apenas as colunas necessárias para a listagem (sem form_data / movimentacoes / anexos)
   let query = supabase
     .from("processos_emendas")
     .select(
-      "hash, num, ano, num_formatado, assunto, data, hora, origem_setor, situacao_atual, search_autores, search_categoria, search_esfera, search_ano, form_data"
+      "hash, num, ano, num_formatado, assunto, data, hora, origem_setor, situacao_atual, search_autores, search_categoria, search_esfera, search_ano, search_entidade, search_cnpj, form_data"
     )
     .is("id_emissao_base", null)
     .order("data", { ascending: false })
@@ -47,6 +58,13 @@ export default async function PaginaBuscaProcessos({
       type: "websearch",
       config: "portuguese",
     });
+  if (entidade)
+    query = query.textSearch("search_entidade", entidade, {
+      type: "websearch",
+      config: "portuguese",
+    });
+  // CNPJ: busca por substring usando ilike + índice pg_trgm (sem curingas no B-Tree)
+  if (cnpj) query = query.ilike("search_cnpj", `%${cnpj}%`);
 
   const { data: processos, error } = await query;
 
@@ -60,6 +78,8 @@ export default async function PaginaBuscaProcessos({
     categoria: categoria ?? "",
     esfera: esfera ?? "",
     autor: autorBruto ?? "",
+    entidade: entidadeBruta ?? "",
+    cnpj: cnpjBruto ?? "",
   };
 
   return (

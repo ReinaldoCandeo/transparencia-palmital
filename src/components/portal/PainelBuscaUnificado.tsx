@@ -32,6 +32,8 @@ export interface FiltrosAtivos {
   categoria: string;
   esfera: string;
   autor: string;
+  entidade: string;
+  cnpj: string;
 }
 
 export function PainelBuscaUnificado({
@@ -211,6 +213,29 @@ export function PainelBuscaUnificado({
                   onCommit={(v) => handleChange("autor", v)}
                 />
               </div>
+              <div className="col-span-2 sm:col-span-3 md:col-span-2 lg:col-span-2">
+                <FiltroTextInput
+                  id="filtro-entidade"
+                  label="Entidade Beneficiada"
+                  value={filtrosAtivos.entidade}
+                  placeholder="Ex: Associação Palmital..."
+                  onCommit={(v) => handleChange("entidade", v)}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-3 md:col-span-2 lg:col-span-1">
+                <FiltroTextInput
+                  id="filtro-cnpj"
+                  label="CNPJ"
+                  value={filtrosAtivos.cnpj}
+                  placeholder="Ex: 44.543.981/0001-99"
+                  maxLength={18}
+                  onCommit={(raw) => {
+                    // Remove máscara antes de injetar na URL: URL limpa com só dígitos
+                    const digits = raw.replace(/[.\-\/]/g, "").trim();
+                    handleChange("cnpj", digits);
+                  }}
+                />
+              </div>
             </div>
 
             {temFiltroAtivo && (
@@ -227,6 +252,41 @@ export function PainelBuscaUnificado({
   );
 }
 
+function FiltroTextInput({
+  id,
+  label,
+  value,
+  placeholder,
+  maxLength,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  maxLength?: number;
+  onCommit: (v: string) => void;
+}) {
+  return (
+    <label htmlFor={id} className="flex flex-col gap-1.5 text-xs font-medium text-foreground w-full">
+      {label}
+      <input
+        id={id}
+        type="text"
+        defaultValue={value}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onCommit((e.target as HTMLInputElement).value.trim());
+          }
+        }}
+        onBlur={(e) => onCommit(e.target.value.trim())}
+        className="w-full rounded-md border border-input bg-background py-2 px-3 text-sm text-foreground shadow-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary hover:border-primary/50 placeholder:text-muted-foreground/50 transition-colors"
+      />
+    </label>
+  );
+}
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
 function FiltroSelect({
@@ -349,6 +409,8 @@ function ActiveFiltersChips({
     categoria: "Categoria",
     esfera: "Esfera",
     autor: "Autor",
+    entidade: "Entidade",
+    cnpj: "CNPJ",
   };
 
   const CATEGORIA_LABELS: Record<string, string> = {
