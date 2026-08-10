@@ -267,13 +267,20 @@ function FiltroTextInput({
   maxLength?: number;
   onCommit: (v: string) => void;
 }) {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
   return (
     <label htmlFor={id} className="flex flex-col gap-1.5 text-xs font-medium text-foreground w-full">
       {label}
       <input
         id={id}
         type="text"
-        defaultValue={value}
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
         placeholder={placeholder}
         maxLength={maxLength}
         onKeyDown={(e) => {
@@ -444,13 +451,20 @@ function FiltroAutorInput({
   value: string;
   onCommit: (v: string) => void;
 }) {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
   return (
     <label className="flex flex-col gap-1.5 text-xs font-medium text-foreground w-full">
       Autor (Vereador / Parlamentar)
       <div className="relative">
         <input
           type="text"
-          defaultValue={value}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
           placeholder="Ex: Marcelo Silva"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
