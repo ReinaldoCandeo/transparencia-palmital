@@ -112,16 +112,27 @@ export function extractSearchCategoria(idAssunto: number): string {
  */
 export function extractAnoEmenda(formData: any[], conteudoSemHtml?: string): number | null {
   if (Array.isArray(formData)) {
-    const item = formData.find((f: any) => {
+    // 1. Prioridade Alta: "ano de execucao" ou "exercicio" (Formato Novo e Legado de Saúde)
+    let itemPrioritario = formData.find((f: any) => {
       const norm = normalizeLabel(f.label || "");
-      return norm.includes("exercicio") || norm === "ano" || norm.includes("ano da emenda");
+      return norm.includes("ano de execucao") || norm.includes("exercicio");
     });
-    if (item?.valor) {
-      const match = item.valor.match(/\b(20\d{2})\b/);
+
+    // 2. Fallback (Prioridade Baixa): "ano da emenda" ou apenas "ano" (Formatos Legados Genéricos)
+    if (!itemPrioritario) {
+      itemPrioritario = formData.find((f: any) => {
+        const norm = normalizeLabel(f.label || "");
+        return norm.includes("ano da emenda") || norm === "ano";
+      });
+    }
+
+    if (itemPrioritario?.valor) {
+      const match = itemPrioritario.valor.match(/\b(20\d{2})\b/);
       if (match) return parseInt(match[1], 10);
     }
   }
 
+  // 3. Fallback final no texto livre (caso falhe o JSON)
   if (conteudoSemHtml) {
     const match = conteudoSemHtml.match(/\b(?:exerc[ií]cio|ano)(?:\s+de)?\s*(20\d{2})\b/i);
     if (match) {
