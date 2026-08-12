@@ -41,7 +41,7 @@ const WHITELIST_TERCEIRO_SETOR = new Set([
   "modalidade", "origem", "ano", "objeto", "objeto da despesa",
   "concessor", "beneficiaria", "razao social", "cnpj", "cnpj concessor",
   "cnpj da unidade", "gnd", "esfera", "esfrea", "no espelho", "n. espelho",
-  "ente federado", "total programado",
+  "ente federado", "total programado", "proposta",
 ]);
 
 const WHITELIST_SAUDE = new Set([
@@ -53,7 +53,7 @@ const WHITELIST_SAUDE = new Set([
 
 const WHITELIST_MUNICIPAL = new Set([
   "esfera", "esfrea", "ente federado", "total programado", "valor", "gnd",
-  "no espelho", "n. espelho", "modalidade", "origem",
+  "no espelho", "n. espelho", "modalidade", "origem", "proposta",
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -281,10 +281,8 @@ export function EmendaTerceiroSetorBlock({
     extractFromForm(formData, "objeto da despesa") ||
     extractFromForm(formData, "objeto");
   const modalidade = extractFromForm(formData, "modalidade");
-  const lei =
-    extractFromForm(formData, "lei") ||
-    extractFromForm(formData, "no espelho") ||
-    extractFromForm(formData, "n. espelho");
+  const lei = extractFromForm(formData, "lei") || extractFromForm(formData, "portaria");
+  const numEspelho = extractFromForm(formData, "no espelho") || extractFromForm(formData, "n. espelho");
 
   // Título específico por tipo de processo
   const isEsporte = idAssunto === 1915759;
@@ -311,9 +309,13 @@ export function EmendaTerceiroSetorBlock({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-xl font-bold text-blue-700 dark:text-blue-400">{titulo}</h3>
-            {(modalidade || lei) && (
+            {(modalidade || lei || numEspelho) && (
               <p className="mt-0.5 text-sm text-blue-600/80 dark:text-blue-400/70">
-                {[modalidade, lei ? `Lei/Portaria ${lei}` : null].filter(Boolean).join(" • ")}
+                {[
+                  modalidade,
+                  lei ? `Lei/Portaria ${lei}` : null,
+                  numEspelho ? `Nº Espelho ${numEspelho}` : null
+                ].filter(Boolean).join(" • ")}
               </p>
             )}
           </div>

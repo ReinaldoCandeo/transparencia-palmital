@@ -1,0 +1,135 @@
+{
+  "hash": "0A963B04A6ABB39490AD52CF",
+  "num": "633",
+  "ano": "2026",
+  "num_formatado": "633/2026",
+  "assunto": "GOTA (TELHADO) - REPASSE DE EMENDA IMPOSITIVA",
+  "id_assunto": 1914761,
+  "data": "2026-02-24",
+  "hora": "09:01:41",
+  "origem_setor": "SECADM-CONT - Setor de Contabilidade",
+  "destino_setor": "SECADM-EMPENHO - EMPENHOS",
+  "situacao_atual": "Recebido",
+  "movimentacoes": [
+    {
+      "id": "755168",
+      "data": "2026-02-24",
+      "hora": "09:01:42",
+      "anexos": [],
+      "evento": "Enviado e-mail para dry_pedrotti@yahoo.com.br",
+      "origem_setor": "Setor de Contabilidade"
+    },
+    {
+      "id": "55178674",
+      "data": "2026-02-24",
+      "hora": "09:49:15",
+      "anexos": [],
+      "evento": "Encaminhado",
+      "conteudo": "<p> </p>",
+      "origem_setor": "EMPENHOS"
+    },
+    {
+      "id": "755411",
+      "data": "2026-02-24",
+      "hora": "09:49:15",
+      "anexos": [],
+      "evento": "Arquivado",
+      "origem_setor": "EMPENHOS"
+    },
+    {
+      "id": "755412",
+      "data": "2026-02-24",
+      "hora": "09:49:15",
+      "anexos": [],
+      "evento": "Parou de acompanhar",
+      "origem_setor": "EMPENHOS"
+    },
+    {
+      "id": "755409",
+      "data": "2026-02-24",
+      "hora": "09:49:16",
+      "anexos": [],
+      "evento": "Saiu da etapa Documentação",
+      "origem_setor": "EMPENHOS"
+    },
+    {
+      "id": "755410",
+      "data": "2026-02-24",
+      "hora": "09:49:16",
+      "anexos": [],
+      "evento": "Entrou na etapa Liquidação",
+      "origem_setor": "EMPENHOS"
+    },
+    {
+      "id": "55179402",
+      "data": "2026-02-25",
+      "hora": "10:43:58",
+      "anexos": [
+        {
+          "arquivo": "comprovante_633.pdf",
+          "extensao": "pdf",
+          "tipo_mime": "application/pdf",
+          "id_externo": "127727",
+          "url_storage": "https://lhwdlqxpwddzzwsnyapp.supabase.co/storage/v1/object/public/anexos_processos/0A963B04A6ABB39490AD52CF/comprovante-633.pdf",
+          "tamanho_bytes": 59927
+        }
+      ],
+      "evento": "Respondido",
+      "conteudo": "<p> <span style=\"color:#333333;\">Em anexo comprovante de pagamento do empenho 1881/1/2026.</span></p>",
+      "origem_setor": "Setor Financeiro"
+    },
+    {
+      "id": "764639",
+      "data": "2026-03-02",
+      "hora": "10:31:42",
+      "anexos": [],
+      "evento": "Arquivado",
+      "origem_setor": "Setor de Contabilidade"
+    },
+    {
+      "id": "55188935",
+      "data": "2026-03-25",
+      "hora": "10:31:30",
+      "anexos": [
+        {
+          "arquivo": "comprovante_633.pdf",
+          "extensao": "pdf",
+          "tipo_mime": "application/pdf",
+          "id_externo": "134728",
+          "url_storage": "https://lhwdlqxpwddzzwsnyapp.supabase.co/storage/v1/object/public/anexos_processos/0A963B04A6ABB39490AD52CF/comprovante-633.pdf",
+          "tamanho_bytes": 58774
+        }
+      ],
+      "evento": "Respondido",
+      "conteudo": "<p> <span style=\"color:#333333;\">Em anexo comprovante de pagamento do empenho 1881/2/2026.</span></p>",
+      "origem_setor": "Setor Financeiro"
+    },
+    {
+      "id": "801764",
+      "data": "2026-03-31",
+      "hora": "14:47:57",
+      "anexos": [],
+      "evento": "Arquivado",
+      "origem_setor": "Setor de Contabilidade"
+    },
+    {
+      "id": "801765",
+      "data": "2026-03-31",
+      "hora": "14:47:57",
+      "anexos": [],
+      "evento": "Parou de acompanhar",
+      "origem_setor": "Setor de Contabilidade"
+    }
+  ],
+  "anexos": [],
+  "ultima_sincronizacao": "2026-08-04T20:49:42.556+00:00",
+  "id_emissao": "55178602",
+  "id_emissao_base": "55229592",
+  "form_data": [],
+  "conteudo": "<p> </p>",
+  "search_autores": null,
+  "search_esfera": null,
+  "search_categoria": "outros",
+  "search_ano": 2026,
+  "ano_emenda_ext": null
+}

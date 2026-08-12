@@ -86,20 +86,34 @@ export function formatMoedaBR(valor: number): string {
  */
 export function extractRateioAutores(conteudoSemHtml: string): RateioEmenda[] {
   if (!conteudoSemHtml) return [];
-  
-  // Regex buscando os blocos separados por ;
-  // Modificador 'g' para extrair todas as ocorrências na string.
-  // Pode lidar com pequenas variações de espaços.
-  const regex = /Nº da Emenda:\s*(.*?)\s*;\s*Vereador Autor:\s*(.*?)\s*;\s*Valor:\s*(.*?)(?=\n|$)/g;
-  
   const autores: RateioEmenda[] = [];
+  
+  // 1. Tenta o padrão novo: "50410001/2026 - Bruno Henrique - R$ 10.000,00;"
+  // Captura global buscando (Emenda) - (Autor) - (Valor) seguido de ; ou \n ou final da string
+  const regexNovo = /([a-zA-Z0-9./]+)\s*-\s*([a-zA-ZÀ-ÿ\s]+?)\s*-\s*(R\$?\s*[\d.,]+)(?=[;\n]|$)/g;
+  
   let match;
-  while ((match = regex.exec(conteudoSemHtml)) !== null) {
+  let encontrouNovo = false;
+  
+  while ((match = regexNovo.exec(conteudoSemHtml)) !== null) {
+    encontrouNovo = true;
     autores.push({
       emenda: match[1].trim(),
       autor: match[2].trim(),
       valor: match[3].trim()
     });
+  }
+
+  // 2. Fallback: Se não encontrou nenhum padrão novo, roda a regex legada
+  if (!encontrouNovo) {
+    const regexLegado = /Nº da Emenda:\s*(.*?)\s*;\s*Vereador Autor:\s*(.*?)\s*;\s*Valor:\s*(.*?)(?=\n|$)/g;
+    while ((match = regexLegado.exec(conteudoSemHtml)) !== null) {
+      autores.push({
+        emenda: match[1].trim(),
+        autor: match[2].trim(),
+        valor: match[3].trim()
+      });
+    }
   }
   
   return autores;
