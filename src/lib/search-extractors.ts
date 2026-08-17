@@ -101,6 +101,7 @@ export function extractSearchCategoria(idAssunto: number): string {
     1915774: "terceiro_setor", // Agricultura e Meio Ambiente
     1915763: "terceiro_setor", // Educação e Cultura
     1915764: "terceiro_setor", // Saúde (municipal repasse)
+    1915780: "obras", // Emenda Parlamentar (Cadastro) - OBRAS
   };
   return MAP[idAssunto] ?? "outros";
 }
