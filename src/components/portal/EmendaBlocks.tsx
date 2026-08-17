@@ -42,6 +42,8 @@ const WHITELIST_TERCEIRO_SETOR = new Set([
   "concessor", "beneficiaria", "razao social", "cnpj", "cnpj concessor",
   "cnpj da unidade", "gnd", "esfera", "esfrea", "no espelho", "n. espelho",
   "ente federado", "total programado", "proposta",
+  "data do credito", "localidade beneficiada", "nome do banco", "banco",
+  "agencia", "no da conta", "n. da conta", "conta"
 ]);
 
 const WHITELIST_SAUDE = new Set([
@@ -54,6 +56,9 @@ const WHITELIST_SAUDE = new Set([
 const WHITELIST_MUNICIPAL = new Set([
   "esfera", "esfrea", "ente federado", "total programado", "valor", "gnd",
   "no espelho", "n. espelho", "modalidade", "origem", "proposta",
+  "data de aprovacao", "data de aprovacao (camara)", "data do credito",
+  "localidade beneficiada", "nome do banco", "banco", "agencia",
+  "no da conta", "n. da conta", "conta"
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

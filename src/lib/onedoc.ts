@@ -283,6 +283,11 @@ export const ASSUNTOS_SAUDE = new Set([
   1915747, // Controle Interno de Emendas - SAÚDE
 ]);
 
+/** Controle interno de obras (infraestrutura) */
+export const ASSUNTOS_OBRAS = new Set([
+  1915780, // Emenda Parlamentar (Cadastro) - OBRAS
+]);
+
 /** Todos os IDs que representam o fluxo "Terceiro Setor" */
 export const ASSUNTOS_TERCEIRO_SETOR = new Set([
   1915739, // Terceiro Setor - Emendas Municipais - SOCIAL
@@ -297,6 +302,7 @@ export const ASSUNTOS_TERCEIRO_SETOR = new Set([
 /** União de todos os assuntos aceitos pelo portal (porteira de ingestão) */
 export const ASSUNTOS_EMENDA = new Set([
   ...ASSUNTOS_SAUDE,
+  ...ASSUNTOS_OBRAS,
   ...ASSUNTOS_TERCEIRO_SETOR,
 ]);
 
