@@ -345,6 +345,10 @@ export default async function DetalhesProcesso({
                     idAssunto={p.id_assunto}
                   />
                 )}
+
+                {(!ASSUNTOS_SAUDE.has(p.id_assunto) && !ASSUNTOS_TERCEIRO_SETOR.has(p.id_assunto)) && (
+                  <EmendaMunicipalBlock formData={p.form_data || []} conteudo={p.conteudo} />
+                )}
               </>
             )}
 

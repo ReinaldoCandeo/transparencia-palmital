@@ -54,14 +54,45 @@ const WHITELIST_SAUDE = new Set([
 ]);
 
 const WHITELIST_MUNICIPAL = new Set([
-  "esfera", "esfrea", "ente federado", "total programado", "valor", "gnd",
-  "no espelho", "n. espelho", "modalidade", "origem", "proposta",
-  "data de aprovacao", "data de aprovacao (camara)", "data do credito",
-  "localidade beneficiada", "nome do banco", "banco", "agencia",
-  "no da conta", "n. da conta", "conta"
+  "origem", "esfera", "modalidade", "n. da emenda", "no da emenda",
+  "ano de execucao", "autor", "lei", "portaria", "tipo", "gnd",
+  "valor", "data de aprovacao", "entidade beneficiada", "cnpj da entidade",
+  "orgao concessor", "cnpj do orgao", "localidade beneficiada",
+  "justificativa", "observacoes"
+]);
+
+const CAMPOS_DESTACADOS_MUNICIPAL = new Set([
+  "valor", "valor indicado (total)", "valor do repasse",
+  "entidade beneficiada", "cnpj da entidade", "cnpj", "cnpj beneficiaria",
+  "orgao concessor", "cnpj do orgao", "cnpj concessor",
+  "autor",
+  "n. da emenda", "nº da emenda", "ano de execucao", "ano", "lei", "portaria",
+  "origem", "esfera",
+  "modalidade", "modalidade do repasse",
+  "tipo", "gnd",
+  "localidade", "localidade beneficiada",
+  "data de aprovacao",
+  "justificativa", "justificativa da emenda", "observacoes"
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatLabelDisplay(rawLabel: string): string {
+  if (!rawLabel) return "";
+  
+  // 1. Limpeza de rascunhos (remove qualquer texto interno tipo "(passar para Impedimento técnico?)")
+  let cleanLabel = rawLabel.replace(/\(passar para.*?\)/gi, "").trim();
+  
+  // Remove parênteses sobrando no final da string "Data (Câmara))" -> "Data (Câmara)"
+  cleanLabel = cleanLabel.replace(/\)+$/, ")").trim();
+
+  // 2. Dicionário explícito para consertar digitação
+  const norm = normalizeLabel(cleanLabel);
+  if (norm.includes("data de aprovacao (camara)")) return "Data de Aprovação (Câmara)";
+  if (norm === "valor indicado (total)") return "Valor Indicado (Total)";
+  
+  return cleanLabel;
+}
 
 function parseValorDisplay(label: string, valor: string | null | undefined): string {
   if (!valor) return "";
@@ -120,7 +151,7 @@ function iconForSaudeLabel(norm: string): React.ElementType {
 function Campo({ label, valor }: { label: string; valor: string }) {
   return (
     <div className="flex flex-col space-y-1">
-      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{formatLabelDisplay(label)}</span>
       <span className="text-sm font-medium text-foreground">{valor}</span>
     </div>
   );
@@ -131,7 +162,7 @@ function CampoComIcone({ icon: Icon, label, valor }: { icon: React.ElementType; 
     <div>
       <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
         <Icon className="h-3.5 w-3.5" />
-        {label}
+        {formatLabelDisplay(label)}
       </dt>
       <dd className="mt-1.5 text-sm font-medium text-foreground">{valor}</dd>
     </div>
@@ -439,9 +470,72 @@ export function EmendaMunicipalBlock({
   formData: any[];
   conteudo?: string;
 }) {
-  const camposGrid = (formData || []).filter((item) => {
-    if (!item.label || !item.valor) return false;
+  // Pré-processamento: Mesclar campos "Outro" e ocultar observações vazias
+  let processedFormData = formData || [];
+
+  const modalidadeOutros = processedFormData.find(item => normalizeLabel(item.label).includes("modalidade") && normalizeLabel(item.label).includes("outro"));
+  const tipoOutros = processedFormData.find(item => normalizeLabel(item.label).includes("tipo") && normalizeLabel(item.label).includes("outro"));
+
+  processedFormData = processedFormData.map(item => {
     const norm = normalizeLabel(item.label);
+    
+    if (norm.includes("modalidade do repasse") && item.valor?.toLowerCase().includes("outro") && modalidadeOutros?.valor) {
+      return { ...item, valor: modalidadeOutros.valor };
+    }
+    
+    if (norm.includes("tipo") && norm.includes("gnd") && item.valor?.toLowerCase().includes("outro") && tipoOutros?.valor) {
+      return { ...item, valor: tipoOutros.valor };
+    }
+    
+    return item;
+  });
+
+  if (modalidadeOutros) {
+    processedFormData = processedFormData.filter(item => item !== modalidadeOutros);
+  }
+  if (tipoOutros) {
+    processedFormData = processedFormData.filter(item => item !== tipoOutros);
+  }
+
+  // Helper para buscar campos por nome
+  const extract = (key: string) => {
+    const normKey = normalizeLabel(key);
+    const item = processedFormData.find((i) => normalizeLabel(i.label).includes(normKey));
+    return item?.valor;
+  };
+
+  const valorGlobalStr = extract("valor") || extract("valor indicado (total)");
+  
+  const beneficiaria = extract("entidade beneficiada") || extract("beneficiaria");
+  const cnpjBenef = extract("cnpj da entidade") || extract("cnpj benefici");
+  
+  const CNPJ_PREFEITURA = "44.543.981/0001-99";
+  const NOME_PREFEITURA = "Prefeitura Municipal de Palmital";
+  const isCNPJ = (v: string) => /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(v.trim());
+  const concessorRaw = extract("orgao concessor") || extract("ente concedente");
+  const concessorNome = concessorRaw && !isCNPJ(concessorRaw) ? concessorRaw : NOME_PREFEITURA;
+  const cnpjConcess = extract("cnpj do orgao") || extract("cnpj concessor") || (concessorRaw && isCNPJ(concessorRaw) ? concessorRaw : CNPJ_PREFEITURA);
+
+  const autor = extract("autor");
+  const numEmenda = extract("n. da emenda") || extract("nº da emenda");
+  const anoExecucao = extract("ano de execucao") || extract("ano");
+  const lei = extract("lei") || extract("portaria");
+  
+  const esfera = extract("origem") || extract("esfera");
+  const modalidade = extract("modalidade");
+  const gnd = extract("tipo") || extract("gnd");
+  const localidade = extract("localidade");
+  const dataAprovacao = extract("data de aprovacao");
+  const justificativa = extract("justificativa");
+
+  // Campos extras (da whitelist municipal que não foram mapeados na view bespoke)
+  const camposExtras = processedFormData.filter((item) => {
+    if (!item.label || (!item.valor && !item.tipo?.startsWith("titulo"))) return false;
+    // Ignoramos títulos para a exibição de campos soltos
+    if (item.tipo?.startsWith("titulo")) return false;
+
+    const norm = normalizeLabel(item.label);
+    if (Array.from(CAMPOS_DESTACADOS_MUNICIPAL).some((e) => norm.includes(e))) return false;
     return Array.from(WHITELIST_MUNICIPAL).some((w) => norm.includes(w));
   });
 
@@ -454,30 +548,114 @@ export function EmendaMunicipalBlock({
             <Building className="h-6 w-6" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-purple-700 dark:text-purple-400">Destinação Direta (Municipal)</h3>
+            <h3 className="text-xl font-bold text-purple-700 dark:text-purple-400">Destinação Direta</h3>
             <p className="mt-0.5 text-sm text-purple-600/80 dark:text-purple-400/70">
               Formulário de Controle Interno
             </p>
           </div>
+          {valorGlobalStr && parseMoedaToNumber(valorGlobalStr) > 0 && (
+            <div className="text-right shrink-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-purple-500/70">
+                Valor do Repasse (Total)
+              </p>
+              <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">
+                {parseValorDisplay("valor", valorGlobalStr)}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="p-6 sm:p-8 space-y-6">
-        {camposGrid.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {camposGrid.map((item, i) => (
+        {/* Entidade + Concessor */}
+        {(beneficiaria || concessorNome) && (
+          <dl className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {beneficiaria && (
+              <div>
+                <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  <Tag className="h-3.5 w-3.5" /> Entidade Beneficiária
+                </dt>
+                <dd className="mt-2 text-sm font-semibold text-foreground leading-snug">{beneficiaria}</dd>
+                {cnpjBenef && (
+                  <dd className="mt-1 text-xs text-muted-foreground font-mono">CNPJ: {cnpjBenef}</dd>
+                )}
+                {localidade && (
+                  <dd className="mt-1 text-xs text-muted-foreground">Localidade: {localidade}</dd>
+                )}
+              </div>
+            )}
+            {concessorNome && (
+              <div>
+                <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  <Building className="h-3.5 w-3.5" /> Órgão Concessor
+                </dt>
+                <dd className="mt-2 text-sm font-semibold text-foreground leading-snug">{concessorNome}</dd>
+                {cnpjConcess && (
+                  <dd className="mt-1 text-xs text-muted-foreground font-mono">CNPJ: {cnpjConcess}</dd>
+                )}
+              </div>
+            )}
+          </dl>
+        )}
+
+        {/* Autores dos Repasses */}
+        {autor && (
+          <div className="border-t pt-5">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              <Hash className="h-3.5 w-3.5" /> Autores dos Repasses
+            </p>
+            <ul className="space-y-2">
+              <li className="flex items-center justify-between gap-4 text-sm rounded-lg px-3 py-2 bg-muted/40">
+                <span className="font-medium text-foreground">{autor}</span>
+                <span className="text-muted-foreground text-xs shrink-0">
+                  {numEmenda ? `Emenda nº ${numEmenda}` : ""}
+                </span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        {/* Grid de Informações Principais */}
+        {(esfera || modalidade || anoExecucao || gnd || dataAprovacao || lei) && (
+          <div className="border-t pt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            {esfera && <Campo label="Esfera" valor={esfera} />}
+            {modalidade && <Campo label="Modalidade do Repasse" valor={modalidade} />}
+            {lei && <Campo label="Nº Lei/Portaria" valor={lei} />}
+            {anoExecucao && <Campo label="Ano de Execução" valor={anoExecucao} />}
+            {gnd && <Campo label="Tipo / GND" valor={gnd} />}
+            {dataAprovacao && <Campo label="Data de Aprovação" valor={parseValorDisplay("data", dataAprovacao)} />}
+          </div>
+        )}
+
+        {/* Campos extras da whitelist */}
+        {camposExtras.length > 0 && (
+          <div className="border-t pt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {camposExtras.map((item, i) => (
               <Campo key={i} label={item.label} valor={parseValorDisplay(item.label, item.valor)} />
             ))}
           </div>
         )}
 
-        {conteudo && (
+        {/* Justificativa da Emenda */}
+        {justificativa && (
           <div className="border-t pt-5">
-            <h4 className="mb-2 text-sm font-bold text-muted-foreground">Observações do Processo</h4>
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
-              dangerouslySetInnerHTML={{ __html: conteudo }}
-            />
+            <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              <ScrollText className="h-3.5 w-3.5" /> Justificativa da Emenda
+            </h4>
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              {justificativa}
+            </p>
+          </div>
+        )}
+
+        {/* Observações do Processo */}
+        {conteudo && conteudo.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, '').trim() !== '' && (
+          <div className="border-t pt-5">
+            <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              <ScrollText className="h-3.5 w-3.5" /> Observações do Processo
+            </h4>
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/80 leading-relaxed" 
+                 dangerouslySetInnerHTML={{ __html: conteudo }} />
           </div>
         )}
       </div>

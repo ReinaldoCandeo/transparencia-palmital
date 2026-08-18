@@ -251,9 +251,9 @@ function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tip
       if (!labelStr) continue; // Pula labels vazias
       
       const valorCru = (p as any)[def.campo];
-      if (valorCru === undefined || valorCru === null || valorCru === "") continue;
+      if ((valorCru === undefined || valorCru === null || valorCru === "") && !def.tipo?.startsWith("titulo")) continue;
 
-      let valorFormatado = stripHtml(valorCru);
+      let valorFormatado = stripHtml(String(valorCru || ""));
       
       // Formatação baseada no tipo ou conteúdo
       if (def.tipo === "text" && valorFormatado.match(/^\d{1,3}(\.\d{3})*,\d{2}$/)) {

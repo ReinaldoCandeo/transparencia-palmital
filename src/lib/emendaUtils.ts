@@ -51,24 +51,42 @@ export interface RateioEmenda {
 }
 
 /** 
- * Converte string de moeda BR para número.
- * Lida com: "R$ 3.700,00", "2.000,00", "5000", etc.
+ * Converte string de moeda BR para número de forma resiliente.
+ * Lida com: "R$ 3.700,00", "2.000,00", "15.000,0", "5000", etc.
  */
 export function parseMoedaToNumber(valor: string | null | undefined): number {
   if (!valor) return 0;
   const limpo = valor
-    .replace(/R\$/g, "")
+    .replace(/R\$/gi, "")
     .replace(/[^\d,\.]/g, "")  // Remove tudo exceto dígitos, ponto e vírgula
     .trim();
 
-  // Formato BR: "3.700,00" (ponto = milhar, vírgula = decimal)
-  if (/^\d{1,3}(\.\d{3})*,\d{2}$/.test(limpo)) {
-    const num = parseFloat(limpo.replace(/\./g, "").replace(",", "."));
+  // Se tiver vírgula, assumimos SEMPRE que a ÚLTIMA vírgula é o separador decimal (Padrão BRL).
+  // Ex: "15.000,0" -> inteiros: "15000", decimais: "0" -> 15000.0
+  // Ex: "1,500.00,00" (sujo) -> inteiros: "150000", decimais: "00"
+  if (limpo.includes(",")) {
+    const partes = limpo.split(",");
+    const decimais = partes.pop(); // tira o último
+    const inteiros = partes.join("").replace(/\./g, ""); // limpa eventuais pontos e vírgulas perdidas
+    const num = parseFloat(`${inteiros}.${decimais}`);
     return isNaN(num) ? 0 : num;
   }
 
-  // Sem separador de milhar: "2000,00" ou "2000.00"
-  const num = parseFloat(limpo.replace(",", "."));
+  // Se não tiver vírgula, mas tiver ponto
+  if (limpo.includes(".")) {
+    const partes = limpo.split(".");
+    // Se tiver exatamente 1 ponto e 3 dígitos depois, assumimos que é milhar brasileiro (ex: 15.000)
+    if (partes.length === 2 && partes[1].length === 3) {
+      const num = parseFloat(limpo.replace(/\./g, ""));
+      return isNaN(num) ? 0 : num;
+    }
+    // Caso contrário, assumimos que o ponto atua como decimal (ex: 15000.50)
+    const num = parseFloat(limpo);
+    return isNaN(num) ? 0 : num;
+  }
+
+  // Apenas números puros "15000"
+  const num = parseFloat(limpo);
   return isNaN(num) ? 0 : num;
 }
 
