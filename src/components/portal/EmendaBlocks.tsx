@@ -459,32 +459,50 @@ export function EmendaMunicipalBlock({
   formData: any[];
   conteudo?: string;
 }) {
-  const isNewForm = (formData || []).some(item => item.tipo?.startsWith("titulo"));
+  // Pré-processamento: Mesclar campos "Outro" e ocultar observações vazias
+  let processedFormData = formData || [];
 
-  const camposGrid = (formData || []).filter((item) => {
+  const modalidadeOutros = processedFormData.find(item => normalizeLabel(item.label).includes("modalidade") && normalizeLabel(item.label).includes("outro"));
+  const tipoOutros = processedFormData.find(item => normalizeLabel(item.label).includes("tipo") && normalizeLabel(item.label).includes("outro"));
+
+  processedFormData = processedFormData.map(item => {
+    const norm = normalizeLabel(item.label);
+    
+    if (norm === "modalidade do repasse" && item.valor?.toLowerCase().includes("outro") && modalidadeOutros?.valor) {
+      return { ...item, valor: modalidadeOutros.valor };
+    }
+    
+    if (norm.includes("tipo") && norm.includes("gnd") && item.valor?.toLowerCase().includes("outro") && tipoOutros?.valor) {
+      return { ...item, valor: tipoOutros.valor };
+    }
+    
+    return item;
+  });
+
+  if (modalidadeOutros) {
+    processedFormData = processedFormData.filter(item => item !== modalidadeOutros);
+  }
+  if (tipoOutros) {
+    processedFormData = processedFormData.filter(item => item !== tipoOutros);
+  }
+
+  // Ocultar observações se estiverem vazias
+  processedFormData = processedFormData.filter(item => {
+    if (normalizeLabel(item.label).includes("observacoes") && (!item.valor || item.valor.trim() === "")) return false;
+    return true;
+  });
+
+  const isNewForm = processedFormData.some(item => item.tipo?.startsWith("titulo"));
+
+  const camposGrid = processedFormData.filter((item) => {
     if (!item.label || (!item.valor && !item.tipo?.startsWith("titulo"))) return false;
     const norm = normalizeLabel(item.label);
     
-    // Ignorar o campo complementar "outro" em si para não renderizar em dobro
-    if (norm.includes("modalidade") && norm.includes("outro")) return false;
-
     // Se for o form novo, exibir tudo. Senão, usar a whitelist legada.
     if (isNewForm) return true;
 
     return Array.from(WHITELIST_MUNICIPAL).some((w) => norm.includes(w));
   }).map((item) => {
-    const norm = normalizeLabel(item.label);
-    
-    // Se for "modalidade" e estiver marcado como "Outro (especificar)", buscar o valor no campo complementar
-    if (norm.includes("modalidade") && item.valor && item.valor.toLowerCase().includes("outro (especificar)")) {
-      const outroField = formData.find((f) => {
-        const fnorm = normalizeLabel(f.label);
-        return fnorm.includes("modalidade") && fnorm.includes("outro");
-      });
-      if (outroField && outroField.valor) {
-        return { ...item, valor: outroField.valor };
-      }
-    }
     return item;
   });
 
@@ -574,13 +592,11 @@ export function EmendaMunicipalBlock({
           </div>
         )}
 
-        {conteudo && (
+        {conteudo && conteudo.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, '').trim() !== '' && (
           <div className="border-t pt-5">
             <h4 className="mb-2 text-sm font-bold text-muted-foreground">Observações do Processo</h4>
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
-              dangerouslySetInnerHTML={{ __html: conteudo }}
-            />
+            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/80 leading-relaxed" 
+                 dangerouslySetInnerHTML={{ __html: conteudo }} />
           </div>
         )}
       </div>
