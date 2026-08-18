@@ -61,7 +61,24 @@ export async function GET(req: NextRequest) {
         .map((p) => p.hash);
     } 
     // =========================================================================
-    // MODO RETRY: Busca no Supabase (Resiliência de Anexos)
+    // MODO DEEP SWEEP: Varredura Profunda (Carrossel Infinito)
+    // Foco: Puxar os processos mais antigos sem sincronização no BD e forçar o sync.
+    // =========================================================================
+    else if (mode === "deep") {
+      const { data: dbProcessos } = await supabaseAdmin
+        .from("processos_emendas")
+        .select("hash")
+        .order("ultima_sincronizacao", { ascending: true, nullsFirst: true })
+        .limit(20);
+
+      if (dbProcessos && dbProcessos.length > 0) {
+        processosParaSincronizar = dbProcessos.map((p: any) => p.hash);
+      } else {
+        return NextResponse.json({ ok: true, message: "Nenhum processo no banco para o deep sweep." });
+      }
+    }
+    // =========================================================================
+    // MODO RETRY / VINCULADOS: Busca no Supabase (Resiliência de Anexos)
     // Foco: Retentar processos que falharam no download de PDFs.
     // =========================================================================
     else {
@@ -125,8 +142,9 @@ export async function GET(req: NextRequest) {
 
     // Funil de Segurança (Circuit Breaker)
     // - Shallow: até 10 processos (só texto geralmente)
-    // - Retry: até 2 processos (envolve download de PDF)
-    const limit = mode === "shallow" ? 10 : 2;
+    // - Deep: até 20 processos (checa a API se houve alteração)
+    // - Retry/Vinculados: até 2 processos (envolve download de PDF)
+    const limit = mode === "shallow" ? 10 : (mode === "deep" ? 20 : 2);
     const processosLimitados = processosParaSincronizar.slice(0, limit);
 
     if (processosLimitados.length === 0) {

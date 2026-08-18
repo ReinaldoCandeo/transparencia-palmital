@@ -58,10 +58,30 @@ const WHITELIST_MUNICIPAL = new Set([
   "no espelho", "n. espelho", "modalidade", "origem", "proposta",
   "data de aprovacao", "data de aprovacao (camara)", "data do credito",
   "localidade beneficiada", "nome do banco", "banco", "agencia",
-  "no da conta", "n. da conta", "conta"
+  "no da conta", "n. da conta", "conta", "valor indicado (total)",
+  "no da emenda", "n. da emenda", "ano de execucao", "autor",
+  "lei", "portaria", "entidade beneficiada", "cnpj", "orgao concessor",
+  "justificativa"
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatLabelDisplay(rawLabel: string): string {
+  if (!rawLabel) return "";
+  
+  // 1. Limpeza de rascunhos (remove qualquer texto interno tipo "(passar para Impedimento técnico?)")
+  let cleanLabel = rawLabel.replace(/\(passar para.*?\)/gi, "").trim();
+  
+  // Remove parênteses sobrando no final da string "Data (Câmara))" -> "Data (Câmara)"
+  cleanLabel = cleanLabel.replace(/\)+$/, ")").trim();
+
+  // 2. Dicionário explícito para consertar digitação
+  const norm = normalizeLabel(cleanLabel);
+  if (norm.includes("data de aprovacao (camara)")) return "Data de Aprovação (Câmara)";
+  if (norm === "valor indicado (total)") return "Valor Indicado (Total)";
+  
+  return cleanLabel;
+}
 
 function parseValorDisplay(label: string, valor: string | null | undefined): string {
   if (!valor) return "";
@@ -120,7 +140,7 @@ function iconForSaudeLabel(norm: string): React.ElementType {
 function Campo({ label, valor }: { label: string; valor: string }) {
   return (
     <div className="flex flex-col space-y-1">
-      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{formatLabelDisplay(label)}</span>
       <span className="text-sm font-medium text-foreground">{valor}</span>
     </div>
   );
@@ -131,7 +151,7 @@ function CampoComIcone({ icon: Icon, label, valor }: { icon: React.ElementType; 
     <div>
       <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
         <Icon className="h-3.5 w-3.5" />
-        {label}
+        {formatLabelDisplay(label)}
       </dt>
       <dd className="mt-1.5 text-sm font-medium text-foreground">{valor}</dd>
     </div>
@@ -439,11 +459,89 @@ export function EmendaMunicipalBlock({
   formData: any[];
   conteudo?: string;
 }) {
+  const isNewForm = (formData || []).some(item => item.tipo?.startsWith("titulo"));
+
   const camposGrid = (formData || []).filter((item) => {
-    if (!item.label || !item.valor) return false;
+    if (!item.label || (!item.valor && !item.tipo?.startsWith("titulo"))) return false;
     const norm = normalizeLabel(item.label);
+    
+    // Ignorar o campo complementar "outro" em si para não renderizar em dobro
+    if (norm.includes("modalidade") && norm.includes("outro")) return false;
+
+    // Se for o form novo, exibir tudo. Senão, usar a whitelist legada.
+    if (isNewForm) return true;
+
     return Array.from(WHITELIST_MUNICIPAL).some((w) => norm.includes(w));
+  }).map((item) => {
+    const norm = normalizeLabel(item.label);
+    
+    // Se for "modalidade" e estiver marcado como "Outro (especificar)", buscar o valor no campo complementar
+    if (norm.includes("modalidade") && item.valor && item.valor.toLowerCase().includes("outro (especificar)")) {
+      const outroField = formData.find((f) => {
+        const fnorm = normalizeLabel(f.label);
+        return fnorm.includes("modalidade") && fnorm.includes("outro");
+      });
+      if (outroField && outroField.valor) {
+        return { ...item, valor: outroField.valor };
+      }
+    }
+    return item;
   });
+
+  const justificativa = camposGrid.find(item => normalizeLabel(item.label).includes("justificativa"));
+  const gridNormal = camposGrid.filter(item => !normalizeLabel(item.label).includes("justificativa"));
+
+  // Se existirem títulos, agrupamos em seções.
+  const hasTitles = gridNormal.some(item => item.tipo?.startsWith("titulo"));
+
+  let contentToRender;
+
+  if (hasTitles) {
+    const sections: { title: string; fields: any[] }[] = [];
+    let currentSection = { title: "", fields: [] as any[] };
+
+    gridNormal.forEach((item) => {
+      if (item.tipo?.startsWith("titulo")) {
+        if (currentSection.fields.length > 0) {
+          sections.push(currentSection);
+        }
+        currentSection = { title: item.label, fields: [] };
+      } else {
+        currentSection.fields.push(item);
+      }
+    });
+    if (currentSection.fields.length > 0) {
+      sections.push(currentSection);
+    }
+
+    contentToRender = (
+      <div className="space-y-8">
+        {sections.map((section, idx) => (
+          <div key={idx}>
+            {section.title && (
+              <h4 className="mb-4 text-sm font-bold uppercase tracking-wide text-muted-foreground border-b pb-2">
+                {formatLabelDisplay(section.title)}
+              </h4>
+            )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {section.fields.map((item, i) => (
+                <Campo key={i} label={item.label} valor={parseValorDisplay(item.label, item.valor)} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else {
+    // Fallback: grid normal para processos antigos sem títulos estruturados
+    contentToRender = gridNormal.length > 0 && (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+        {gridNormal.map((item, i) => (
+          <Campo key={i} label={item.label} valor={parseValorDisplay(item.label, item.valor)} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -463,11 +561,16 @@ export function EmendaMunicipalBlock({
       </div>
 
       <div className="p-6 sm:p-8 space-y-6">
-        {camposGrid.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {camposGrid.map((item, i) => (
-              <Campo key={i} label={item.label} valor={parseValorDisplay(item.label, item.valor)} />
-            ))}
+        {contentToRender}
+
+        {justificativa && (
+          <div className="border-t pt-5">
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              {formatLabelDisplay(justificativa.label)}
+            </h4>
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              {justificativa.valor}
+            </p>
           </div>
         )}
 
