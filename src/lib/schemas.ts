@@ -7,6 +7,7 @@ import {
   extractAnoEmenda,
   extractSearchEntidade,
   extractSearchCnpj,
+  extractSearchValorGlobal,
 } from "@/lib/search-extractors";
 
 /**
@@ -81,6 +82,7 @@ export const processoEmendaSchema = z.object({
   ano_emenda_ext:   z.number().int().nullable().optional(),
   search_entidade:  z.string().nullable().optional(),
   search_cnpj:      z.string().nullable().optional(),
+  search_valor_global: z.number().nullable().optional(),
 });
 
 // Tipagem inferida para uso no TypeScript
@@ -110,6 +112,13 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
     ano_emenda_ext:   extractAnoEmenda(formData, conteudoSemHtml) || null,
     search_entidade:  extractSearchEntidade(formData, p.assunto) || null,
     search_cnpj:      extractSearchCnpj(formData) || null,
+    search_valor_global: extractSearchValorGlobal(
+      formData.find(f => 
+        f.label?.toLowerCase().includes("valor global") || 
+        f.label?.toLowerCase().includes("valor do repasse") ||
+        f.label?.toLowerCase().includes("total programado")
+      )?.valor
+    ) || 0,
   };
 
   const { situacao_atual_str, form_data: _form, ...rowLimpa } = row as any;

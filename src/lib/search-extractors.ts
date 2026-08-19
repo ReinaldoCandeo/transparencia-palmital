@@ -191,3 +191,68 @@ export function extractSearchCnpj(formData: any[]): string {
   // Remove formatação: "44.543.981/0001-99" → "44543981000199"
   return cnpj.replace(/[.\-\/]/g, "").trim();
 }
+
+/**
+ * Parse agressivo para valores financeiros (Blindagem Total).
+ * Lida com formatações BR (15.000,00), US (15,000.00), e "cascas de banana" (15.000 = quinze mil).
+ */
+export function extractSearchValorGlobal(valorCru: string | null | undefined): number {
+  if (!valorCru) return 0;
+  
+  let limpo = String(valorCru).replace(/[^0-9,\.-]/g, "");
+  if (!limpo) return 0;
+
+  const isNegative = limpo.startsWith("-");
+  limpo = limpo.replace(/-/g, "");
+
+  const ultimaVirgula = limpo.lastIndexOf(',');
+  const ultimoPonto = limpo.lastIndexOf('.');
+
+  if (ultimaVirgula > -1 && ultimoPonto > -1) {
+    if (ultimaVirgula > ultimoPonto) {
+      limpo = limpo.replace(/\./g, "").replace(",", ".");
+    } else {
+      limpo = limpo.replace(/,/g, "");
+    }
+  } else if (ultimaVirgula > -1) {
+    const qtdeVirgulas = (limpo.match(/,/g) || []).length;
+    const charsDepois = limpo.length - 1 - ultimaVirgula;
+
+    if (qtdeVirgulas > 1) {
+      if (charsDepois === 2) {
+        const partes = limpo.split(',');
+        const decimal = partes.pop();
+        limpo = partes.join('') + '.' + decimal;
+      } else {
+        limpo = limpo.replace(/,/g, ""); 
+      }
+    } else {
+      if (charsDepois === 3) {
+        limpo = limpo.replace(",", ""); 
+      } else {
+        limpo = limpo.replace(",", "."); 
+      }
+    }
+  } else if (ultimoPonto > -1) {
+    const qtdePontos = (limpo.match(/\./g) || []).length;
+    const charsDepois = limpo.length - 1 - ultimoPonto;
+
+    if (qtdePontos > 1) {
+      if (charsDepois === 2) {
+        const partes = limpo.split('.');
+        const decimal = partes.pop();
+        limpo = partes.join('') + '.' + decimal;
+      } else {
+        limpo = limpo.replace(/\./g, ""); 
+      }
+    } else {
+      if (charsDepois === 3) {
+        limpo = limpo.replace(/\./g, ""); 
+      } 
+    }
+  }
+
+  const finalFloat = parseFloat(limpo);
+  const resultado = isNaN(finalFloat) ? 0 : finalFloat;
+  return isNegative ? -resultado : resultado;
+}

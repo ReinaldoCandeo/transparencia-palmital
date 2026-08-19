@@ -58,6 +58,12 @@ export function PortalLayout({ children }: { children: ReactNode }) {
               >
                 Consulta Pública
               </Link>
+              <Link
+                href="/entidades"
+                className="rounded-md px-3 py-2 text-emerald-600 font-medium hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 transition-colors"
+              >
+                Terceiro Setor
+              </Link>
               <a
                 href="#lgpd"
                 className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"

@@ -118,6 +118,28 @@ export default function BuscaProcessosClient({
       {/* Painel de Controle Unificado (Filtros + Acesso Direto) - FLUTUANTE */}
       <PainelBuscaUnificado filtrosAtivos={filtrosAtivos} />
 
+      {/* Banner Institucional: Módulo Terceiro Setor */}
+      <div className="mx-auto max-w-5xl px-4 mb-4">
+        <Link href="/entidades" className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/50 hover:shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                Painel de Transparência: Terceiro Setor
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                Acesse a relação oficial de Organizações da Sociedade Civil (OSCs) e ONGs contempladas com repasses e emendas parlamentares, em conformidade com as diretrizes do Ministério Público.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm font-semibold text-primary group-hover:underline sm:shrink-0 whitespace-nowrap">
+            Acessar Painel Oficial <ArrowRight className="h-4 w-4" />
+          </div>
+        </Link>
+      </div>
+
       {/* Listagem Exploratória (SSR Filtrada) */}
       <section className="mx-auto max-w-7xl px-4 py-10">
         <div className="mt-12 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">

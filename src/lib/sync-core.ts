@@ -148,6 +148,26 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   }
 
   console.log(`[CORE] ✅ Sincronização concluída com sucesso para o processo: ${hash}`);
+
+  // 7. Upsert Autônomo de Entidades do Terceiro Setor
+  if (result.data.search_categoria === "terceiro_setor" && result.data.search_cnpj && result.data.search_entidade) {
+    const { error: upsertError } = await supabaseAdmin
+      .from("dicionario_entidades")
+      .upsert(
+        {
+          cnpj: result.data.search_cnpj,
+          nome_oficial: result.data.search_entidade,
+        },
+        {
+          onConflict: "cnpj",
+          ignoreDuplicates: true
+        }
+      );
+
+    if (upsertError) {
+      console.error(`[CORE] Erro no Upsert da entidade ${result.data.search_entidade}:`, upsertError.message);
+    }
+  }
   
   return {
     data: result.data,
