@@ -6,7 +6,7 @@
  * NÃO importa nada de React/componentes de UI.
  */
 
-import { buildRateioTable, extractFromForm, normalizeLabel } from "@/lib/emendaUtils";
+import { buildRateioTable, extractFromForm, normalizeLabel, parseMoedaToNumber } from "@/lib/emendaUtils";
 
 // ─── Normalização ─────────────────────────────────────────────────────────────
 
@@ -255,4 +255,63 @@ export function extractSearchValorGlobal(valorCru: string | null | undefined): n
   const finalFloat = parseFloat(limpo);
   const resultado = isNaN(finalFloat) ? 0 : finalFloat;
   return isNegative ? -resultado : resultado;
+}
+
+/**
+ * Função para Censura de Documentos Sensíveis (LGPD) com Anti-Falso Positivo
+ */
+export function isAnexoSensivel(filename: string | null | undefined): boolean {
+  if (!filename) return false;
+
+  // Normaliza o nome do arquivo (remove acentos, deixa em minúsculo)
+  const limpo = removeAcentos(filename).toLowerCase();
+
+  // Expressão Regular com Word Boundaries (\b) para a Blocklist Oficial Atualizada.
+  // Evita falsos positivos como "comprovante_cpfl_energia.pdf"
+  const regexSensivel = /\b(rg|cpf|cnh|obito|documento pessoal|identidade|carteira de trabalho|ctps|titulo de eleitor|passaporte|holerite|cns|cartao do sus|residencia|endereco|nascimento|casamento)\b/i;
+
+  return regexSensivel.test(limpo);
+}
+
+/**
+ * Calcula o valor total da emenda (suporta múltiplos autores via Rateio).
+ * Fallback para somar campos "valor" do formulário principal se não houver Rateio.
+ */
+export function calculateTotalValorEmenda(
+  formData: any[],
+  conteudoSemHtml?: string
+): number {
+  if (!Array.isArray(formData)) return 0;
+
+  // Tenta montar o rateio
+  const rateios = buildRateioTable(formData, conteudoSemHtml);
+
+  // Se houver rateio detectado (mesmo 1 autor), soma todos os valores (usando parseMoedaToNumber)
+  if (rateios && rateios.length > 0) {
+    let total = 0;
+    for (const r of rateios) {
+      total += parseMoedaToNumber(r.valor);
+    }
+    // Muitas vezes o Rateio tem autores, mas não tem valores (emendas conjuntas sem divisão prévia).
+    // Se o total for maior que zero, retornamos o rateio. Se for 0, continuamos pro fallback.
+    if (total > 0) return total;
+  }
+
+  // Fallback: extrai todos os campos numéricos de "valor" e soma (se não houver rateio detectado)
+  const valorFields = formData.filter((f: any) => 
+    f.label && (
+      normalizeLabel(f.label).includes("valor global") || 
+      normalizeLabel(f.label).includes("valor do repasse") ||
+      normalizeLabel(f.label).includes("total programado") ||
+      normalizeLabel(f.label) === "valor" ||
+      normalizeLabel(f.label).includes("valor indicado") ||
+      normalizeLabel(f.label).includes("valor disponibilizado")
+    )
+  );
+  
+  if (valorFields.length > 0) {
+    return valorFields.reduce((sum: number, f: any) => sum + extractSearchValorGlobal(f.valor), 0);
+  }
+
+  return 0;
 }

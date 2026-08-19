@@ -8,6 +8,8 @@ import {
   extractSearchEntidade,
   extractSearchCnpj,
   extractSearchValorGlobal,
+  isAnexoSensivel,
+  calculateTotalValorEmenda,
 } from "@/lib/search-extractors";
 
 /**
@@ -99,6 +101,11 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
 
   const row: ProcessoEmendaRow = {
     ...p,
+    anexos: p.anexos ? p.anexos.filter(a => !isAnexoSensivel(a.arquivo)) : [],
+    movimentacoes: p.movimentacoes ? p.movimentacoes.map(m => ({
+      ...m,
+      anexos: m.anexos ? m.anexos.filter(a => !isAnexoSensivel(a.arquivo)) : []
+    })) : [],
     form_data: formData,
     destino_setor: p.destino_setor,
     situacao_atual: p.situacao_atual_str,
@@ -112,13 +119,7 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
     ano_emenda_ext:   extractAnoEmenda(formData, conteudoSemHtml) || null,
     search_entidade:  extractSearchEntidade(formData, p.assunto) || null,
     search_cnpj:      extractSearchCnpj(formData) || null,
-    search_valor_global: extractSearchValorGlobal(
-      formData.find(f => 
-        f.label?.toLowerCase().includes("valor global") || 
-        f.label?.toLowerCase().includes("valor do repasse") ||
-        f.label?.toLowerCase().includes("total programado")
-      )?.valor
-    ) || 0,
+    search_valor_global: calculateTotalValorEmenda(formData, conteudoSemHtml),
   };
 
   const { situacao_atual_str, form_data: _form, ...rowLimpa } = row as any;
