@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { z } from "zod";
+import { isAnexoSensivel } from "./search-extractors";
 // ─── Interfaces do payload bruto da 1Doc ──────────────────────────────────
 
 interface OnedocMovimentacao {
@@ -370,7 +371,9 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
         hora: m.hora,
         origem_setor: m.origem_setor ?? "",
         conteudo: m.conteudo ? cleanHtml(m.conteudo) : undefined,
-        anexos: (m.anexos ?? []).map((a: any) => {
+        anexos: (m.anexos ?? [])
+          .filter((a: any) => !isAnexoSensivel(a.arquivo))
+          .map((a: any) => {
           const partes = a.arquivo.split(".");
           const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
           return {
@@ -383,7 +386,9 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
           };
         }),
       })),
-    anexos: (p.anexos ?? []).map((a) => {
+    anexos: (p.anexos ?? [])
+      .filter((a: any) => !isAnexoSensivel(a.arquivo))
+      .map((a) => {
       const partes = a.arquivo.split(".");
       const extensao = partes.length > 1 ? (partes.pop() ?? "") : "";
       return {
