@@ -1,7 +1,8 @@
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { supabase } from "@/lib/db-client";
 import { EntidadeAccordion } from "@/components/portal/EntidadeAccordion";
-import { Building2, Landmark, HeartHandshake } from "lucide-react";
+import { Building2, Landmark, HeartHandshake, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,13 @@ export default async function PaginaTerceiroSetor() {
               {rankingData.length} entidade{rankingData.length !== 1 ? "s" : ""} registrada{rankingData.length !== 1 ? "s" : ""}
             </p>
           </div>
+          <Link 
+            href="/"
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar para Visão Geral
+          </Link>
         </div>
 
         {rankingData.length === 0 ? (
