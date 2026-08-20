@@ -7,6 +7,14 @@
  */
 
 import { buildRateioTable, extractFromForm, normalizeLabel, parseMoedaToNumber } from "@/lib/emendaUtils";
+import {
+  ASSUNTOS_TERCEIRO_SETOR,
+  ASSUNTOS_SAUDE,
+  ASSUNTOS_OBRAS,
+  ASSUNTOS_EDUCACAO,
+  ASSUNTOS_AGRICULTURA,
+  type SearchCategoria
+} from "@/lib/assuntos";
 
 // ─── Normalização ─────────────────────────────────────────────────────────────
 
@@ -89,21 +97,16 @@ export function extractSearchEsfera(formData: any[]): string {
 
 /**
  * Mapeia o id_assunto para uma categoria textual legível.
- * Estável e resistente a mudanças: novos assuntos mapeiam para "outros".
+ * Derivado diretamente dos Sets de assuntos (fonte de verdade).
  */
-export function extractSearchCategoria(idAssunto: number): string {
-  const MAP: Record<number, string> = {
-    1915747: "saude",
-    1915739: "terceiro_setor",
-    1915759: "esporte", // Emenda Parlamentar - ESPORTE (formato antigo)
-    1915772: "terceiro_setor", // Terceiro Setor - Emendas Municipais - ESPORTE
-    1915740: "terceiro_setor",
-    1915774: "terceiro_setor", // Agricultura e Meio Ambiente
-    1915763: "terceiro_setor", // Educação e Cultura
-    1915764: "terceiro_setor", // Saúde (municipal repasse)
-    1915780: "obras", // Emenda Parlamentar (Cadastro) - OBRAS
-  };
-  return MAP[idAssunto] ?? "outros";
+export function extractSearchCategoria(idAssunto: number): SearchCategoria {
+  if (ASSUNTOS_TERCEIRO_SETOR.has(idAssunto)) return "terceiro_setor";
+  if (ASSUNTOS_SAUDE.has(idAssunto)) return "saude";
+  if (ASSUNTOS_OBRAS.has(idAssunto)) return "obras";
+  if (ASSUNTOS_EDUCACAO.has(idAssunto)) return "educacao";
+  if (ASSUNTOS_AGRICULTURA.has(idAssunto)) return "agricultura";
+  
+  return "outros";
 }
 
 /**
