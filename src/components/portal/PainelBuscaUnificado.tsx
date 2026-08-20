@@ -8,6 +8,9 @@ const OPCOES_CATEGORIA = [
   { value: "", label: "Todas as Categorias" },
   { value: "saude", label: "🏥 Saúde" },
   { value: "terceiro_setor", label: "🤝 Terceiro Setor" },
+  { value: "obras", label: "🏗️ Obras" },
+  { value: "educacao", label: "📚 Educação" },
+  { value: "agricultura", label: "🌱 Agricultura" },
   { value: "esporte", label: "⚽ Esporte" },
 ];
 
@@ -498,6 +501,9 @@ function ActiveFiltersChips({
   const CATEGORIA_LABELS: Record<string, string> = {
     saude: "Saúde",
     terceiro_setor: "Terceiro Setor",
+    obras: "Obras",
+    educacao: "Educação",
+    agricultura: "Agricultura",
     esporte: "Esporte",
   };
 

@@ -271,41 +271,38 @@ function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tip
     }
     return formData;
   } catch (err) {
+    console.error(
+      `[1Doc] JSON inválido em emissao_campos_adicionais_assunto`,
+      `| hash: ${p.hash}`,
+      `| erro: ${err instanceof Error ? err.message : String(err)}`,
+      `| payload (truncado): ${String(camposAdicionaisStr).slice(0, 200)}`
+    );
     return [];
   }
 }
 
 // ─── Grupos Semânticos de Assuntos ─────────────────────────────────────────
 // Fonte única de verdade para toda a regra de negócio do portal.
-// Para adicionar um novo ID: inclua aqui + em ASSUNTOS_EMENDA abaixo.
+// As definições foram movidas para `assuntos.ts` para evitar importação circular.
 
-/** Controle interno de saúde (emendas federais MAC) */
-export const ASSUNTOS_SAUDE = new Set([
-  1915747, // Controle Interno de Emendas - SAÚDE
-]);
+import {
+  ASSUNTOS_SAUDE,
+  ASSUNTOS_OBRAS,
+  ASSUNTOS_AGRICULTURA,
+  ASSUNTOS_EDUCACAO,
+  ASSUNTOS_TERCEIRO_SETOR,
+  ASSUNTOS_EMENDA,
+} from "./assuntos";
 
-/** Controle interno de obras (infraestrutura) */
-export const ASSUNTOS_OBRAS = new Set([
-  1915780, // Emenda Parlamentar (Cadastro) - OBRAS
-]);
+export {
+  ASSUNTOS_SAUDE,
+  ASSUNTOS_OBRAS,
+  ASSUNTOS_AGRICULTURA,
+  ASSUNTOS_EDUCACAO,
+  ASSUNTOS_TERCEIRO_SETOR,
+  ASSUNTOS_EMENDA,
+};
 
-/** Todos os IDs que representam o fluxo "Terceiro Setor" */
-export const ASSUNTOS_TERCEIRO_SETOR = new Set([
-  1915739, // Terceiro Setor - Emendas Municipais - SOCIAL
-  1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - SOCIAL
-  1915759, // Emenda Parlamentar - ESPORTE (formato antigo)
-  1915774, // Terceiro Setor - Emendas Municipais - AGRICULTURA E MEIO AMBIENTE
-  1915763, // Terceiro Setor - Emendas Municipais - EDUCAÇÃO E CULTURA
-  1915772, // Terceiro Setor - Emendas Municipais - ESPORTE
-  1915764, // Terceiro Setor - Emendas Municipais - SAÚDE
-]);
-
-/** União de todos os assuntos aceitos pelo portal (porteira de ingestão) */
-export const ASSUNTOS_EMENDA = new Set([
-  ...ASSUNTOS_SAUDE,
-  ...ASSUNTOS_OBRAS,
-  ...ASSUNTOS_TERCEIRO_SETOR,
-]);
 
 export function extractVinculadosHashesFromHtml(html: string): string[] {
   if (!html) return [];
@@ -495,10 +492,14 @@ interface OnedocDetalheResponse {
   data: OnedocProcesso[];
 }
 
+const DESPACHOS_POR_PAGINA = 20;
+const MAX_PAGINAS_DETALHE = 10;
+
 export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico | null> {
   try {
     const { baseUrl, authHash } = getConfig();
 
+    // ── FASE 1: Busca página 1 (processo base)
     const res = await fetch(
       `${baseUrl}/processos-administrativos/${hash}/despachos?pagina=1`,
       {
@@ -512,18 +513,62 @@ export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico
     }
 
     const json: OnedocDetalheResponse = await res.json();
-    const processo = json.data?.[0] ?? null;
-    if (!processo) {
+    const processoBase = json.data?.[0] ?? null;
+    if (!processoBase) {
       console.warn(`[1Doc] Detalhe ${hash}: API retornou data vazio (processo sem despachos ou recém-criado)`);
       return null;
     }
 
-    // ── FASE 1 - MAPEAMENTO: Inspeciona o campo `conteudo` bruto ──────────
+    const totalDespachos = processoBase.total_despachos ?? 0;
+    const totalPaginasCalculado = Math.ceil(totalDespachos / DESPACHOS_POR_PAGINA);
+    const totalPaginas = Math.min(totalPaginasCalculado, MAX_PAGINAS_DETALHE);
+
+    // ── FASE 2: Busca páginas adicionais (se existirem)
+    if (totalPaginas > 1) {
+      for (let N = 2; N <= totalPaginas; N++) {
+        try {
+          console.log(`[1Doc] Detalhe ${hash}: carregando página ${N}/${totalPaginas}`);
+          const resPagina = await fetch(
+            `${baseUrl}/processos-administrativos/${hash}/despachos?pagina=${N}`,
+            {
+              headers: { "X-Auth-Hash": authHash },
+              signal: AbortSignal.timeout(15000)
+            }
+          );
+          
+          if (resPagina.ok) {
+            const jsonPagina: OnedocDetalheResponse = await resPagina.json();
+            const processoN = jsonPagina.data?.[0];
+            if (processoN?.movimentacoes) {
+              if (!processoBase.movimentacoes) {
+                processoBase.movimentacoes = [];
+              }
+              processoBase.movimentacoes.push(...processoN.movimentacoes);
+            }
+          } else {
+             console.warn(`[1Doc] Detalhe ${hash}: falha ao carregar página ${N} (HTTP ${resPagina.status}). Ignorando.`);
+          }
+        } catch (errPagina) {
+          console.error(`[1Doc] Detalhe ${hash}: falha ao carregar página ${N}`, errPagina);
+        }
+      }
+    }
+
+    // ── FASE 3: Deduplicação e sanitização
+    if (processoBase.movimentacoes && processoBase.movimentacoes.length > 0) {
+      const uniqueMovs = new Map();
+      for (const mov of processoBase.movimentacoes) {
+        uniqueMovs.set(mov.id_emissao_evento, mov);
+      }
+      (processoBase as any).movimentacoes = Array.from(uniqueMovs.values());
+    }
+
+    // ── FASE 4 - MAPEAMENTO: Inspeciona o campo `conteudo` bruto ──────────
     // Logs de diagnóstico removidos (LGPD / Segurança)
     // ────────────────────────────────────────────────────────────────────────
 
     // Boundary Validation
-    const processoSanitizado = OnedocProcessoSchema.parse(processo);
+    const processoSanitizado = OnedocProcessoSchema.parse(processoBase);
 
     return sanitizarProcesso(processoSanitizado);
   } catch (err) {

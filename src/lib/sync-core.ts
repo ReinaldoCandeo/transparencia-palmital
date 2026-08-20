@@ -1,4 +1,5 @@
-import { obterDetalheInterno, ASSUNTOS_EMENDA } from "@/lib/onedoc";
+import { obterDetalheInterno } from "@/lib/onedoc";
+import { ASSUNTOS_EMENDA } from "@/lib/assuntos";
 import { syncAnexoStorage } from "@/lib/storage-sync";
 import { processoEmendaSchema, flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
@@ -149,7 +150,13 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
 
   console.log(`[CORE] ✅ Sincronização concluída com sucesso para o processo: ${hash}`);
 
-  // 7. Upsert Autônomo de Entidades do Terceiro Setor
+  // ─── Dicionário de Entidades (Módulo Exclusivo do Terceiro Setor) ──────────
+  // INTENÇÃO ARQUITETURAL: apenas entidades do tipo terceiro_setor (OSCs, ONGs,
+  // associações beneficiárias de emendas municipais) são cadastradas aqui.
+  // Entidades de outras categorias (saude, obras, etc) NÃO entram neste 
+  // dicionário — são contratados/órgãos públicos, não beneficiários civis.
+  // Não altere esta condição sem aprovação de produto.
+  // ──────────────────────────────────────────────────────────────────────────────
   if (result.data.search_categoria === "terceiro_setor" && result.data.search_cnpj && result.data.search_entidade) {
     const { error: upsertError } = await supabaseAdmin
       .from("dicionario_entidades")
