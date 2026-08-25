@@ -239,46 +239,80 @@ function formatarDataBR(valor: string | null | undefined): string {
  */
 function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tipo?: string }[] {
   const camposAdicionaisStr = (p as any).emissao_campos_adicionais_assunto;
-  if (!camposAdicionaisStr) return [];
+  const formData: { label: string; valor: string; tipo?: string }[] = [];
   
-  try {
-    const camposDefinidos = JSON.parse(camposAdicionaisStr);
-    const formData = [];
-    
-    for (const def of camposDefinidos) {
-      if (!def.campo || !def.label) continue;
-      
-      const labelStr = stripHtml(def.label);
-      if (!labelStr) continue; // Pula labels vazias
-      
-      const valorCru = (p as any)[def.campo];
-      if ((valorCru === undefined || valorCru === null || valorCru === "") && !def.tipo?.startsWith("titulo")) continue;
+  if (camposAdicionaisStr) {
+    try {
+      const camposDefinidos = JSON.parse(camposAdicionaisStr);
+      for (const def of camposDefinidos) {
+        if (!def.campo || !def.label) continue;
+        
+        const labelStr = stripHtml(def.label);
+        if (!labelStr) continue; // Pula labels vazias
+        
+        const valorCru = (p as any)[def.campo];
+        if ((valorCru === undefined || valorCru === null || valorCru === "") && !def.tipo?.startsWith("titulo")) continue;
 
-      let valorFormatado = stripHtml(String(valorCru || ""));
-      
-      // Formatação baseada no tipo ou conteúdo
-      if (def.tipo === "text" && valorFormatado.match(/^\d{1,3}(\.\d{3})*,\d{2}$/)) {
-        valorFormatado = formatarMoeda(valorFormatado);
+        let valorFormatado = stripHtml(String(valorCru || ""));
+        
+        // Formatação baseada no tipo ou conteúdo
+        if (def.tipo === "text" && valorFormatado.match(/^\d{1,3}(\.\d{3})*,\d{2}$/)) {
+          valorFormatado = formatarMoeda(valorFormatado);
+        }
+
+        formData.push({
+          label: labelStr,
+          valor: valorFormatado,
+          tipo: def.tipo
+        });
       }
-
-      // Ocultar dados bancários estritos na extração foi removido (Transparência Ativa)
-
-      formData.push({
-        label: labelStr,
-        valor: valorFormatado,
-        tipo: def.tipo
-      });
+    } catch (err) {
+      console.error(
+        `[1Doc] JSON inválido em emissao_campos_adicionais_assunto`,
+        `| hash: ${p.hash}`,
+        `| erro: ${err instanceof Error ? err.message : String(err)}`,
+        `| payload (truncado): ${String(camposAdicionaisStr).slice(0, 200)}`
+      );
     }
-    return formData;
-  } catch (err) {
-    console.error(
-      `[1Doc] JSON inválido em emissao_campos_adicionais_assunto`,
-      `| hash: ${p.hash}`,
-      `| erro: ${err instanceof Error ? err.message : String(err)}`,
-      `| payload (truncado): ${String(camposAdicionaisStr).slice(0, 200)}`
-    );
-    return [];
   }
+
+  // NOVA DIRETRIZ: Extração Bancária (Etapa 8) - Leitura estruturada das movimentações
+  if (p.movimentacoes && p.movimentacoes.length > 0) {
+    for (const mov of p.movimentacoes) {
+      const nomeEtapa = String(mov.nome_etapa || mov.evento || mov.tipo_movimentacao_str || "").toLowerCase();
+      // Detecta se a movimentação é o trâmite da Etapa 8 (Empenho/Banco)
+      if (nomeEtapa.includes("etapa 8") || nomeEtapa.includes("empenho")) {
+        const camposMovStr = mov.emissao_campos_adicionais_assunto;
+        if (camposMovStr) {
+          try {
+            const camposMov = JSON.parse(camposMovStr);
+            for (const def of camposMov) {
+              if (!def.campo || !def.label) continue;
+              const labelStr = stripHtml(def.label);
+              if (!labelStr) continue;
+              
+              const labelNorm = labelStr.toLowerCase();
+              // Extrair apenas os dados bancários (Banco, Agência, Conta)
+              if (labelNorm.includes("banco") || labelNorm.includes("agencia") || labelNorm.includes("agência") || labelNorm.includes("conta")) {
+                const valorCru = mov[def.campo];
+                if (valorCru !== undefined && valorCru !== null && valorCru !== "") {
+                  formData.push({
+                    label: labelStr,
+                    valor: stripHtml(String(valorCru)),
+                    tipo: def.tipo
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.warn(`[1Doc] JSON inválido na movimentação da Etapa 8. Hash: ${p.hash}`);
+          }
+        }
+      }
+    }
+  }
+
+  return formData;
 }
 
 // ─── Grupos Semânticos de Assuntos ─────────────────────────────────────────
@@ -323,6 +357,21 @@ export function extractVinculadosHashesFromHtml(html: string): string[] {
   return hashes;
 }
 
+function calcularStatusSemantico(situacaoOriginal: string, movimentacoes: any[]): string {
+  if (!movimentacoes || movimentacoes.length === 0) return "Em Formalização";
+  
+  // Extrai todas as descrições de etapas em lower case para busca semântica
+  const etapas = movimentacoes.map(m => String(m.nome_etapa || m.evento || m.tipo_movimentacao_str || "").toLowerCase());
+
+  // Ordem de precedência: de trás para frente no funil
+  if (etapas.some(e => e.includes("etapa 14"))) return "Concluído (AUDESP)";
+  if (etapas.some(e => e.includes("etapa 11") || e.includes("etapa 12") || e.includes("etapa 13"))) return "Em Prestação de Contas";
+  if (etapas.some(e => e.includes("etapa 10") || e.includes("execução") || e.includes("execucao"))) return "Em Execução";
+  
+  // Se não chegou nas etapas de execução/prestação de contas, está em fase inicial
+  return "Em Formalização";
+}
+
 function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
   const processos_vinculados_hashes: string[] = [];
   try {
@@ -354,7 +403,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
     hora: p.hora ?? "",
     origem_setor: p.origem_setor ?? "",
     destino_setor: p.destino_setor ?? "",
-    situacao_atual_str: p.situacao_atual_str ?? "",
+    situacao_atual_str: calcularStatusSemantico(p.situacao_atual_str ?? "", p.movimentacoes ?? []),
     
     // Novo fluxo universal de formulário
     form_data: extrairFormData(p),
@@ -557,8 +606,10 @@ export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico
     // ── FASE 3: Deduplicação e sanitização
     if (processoBase.movimentacoes && processoBase.movimentacoes.length > 0) {
       const uniqueMovs = new Map();
+      let fallbackCounter = 0;
       for (const mov of processoBase.movimentacoes) {
-        uniqueMovs.set(mov.id_emissao_evento, mov);
+        const key = mov.id_emissao_evento || `fallback_${fallbackCounter++}`;
+        uniqueMovs.set(key, mov);
       }
       (processoBase as any).movimentacoes = Array.from(uniqueMovs.values());
     }

@@ -4,21 +4,12 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { X, Search, Target, SlidersHorizontal, Loader2, ChevronDown } from "lucide-react";
 
-const OPCOES_CATEGORIA = [
-  { value: "", label: "Todas as Categorias" },
-  { value: "saude", label: "🏥 Saúde" },
-  { value: "terceiro_setor", label: "🤝 Terceiro Setor" },
-  { value: "obras", label: "🏗️ Obras" },
-  { value: "educacao", label: "📚 Educação" },
-  { value: "agricultura", label: "🌱 Agricultura" },
-  { value: "esporte", label: "⚽ Esporte" },
-];
-
-const OPCOES_ESFERA = [
-  { value: "", label: "Todas as Esferas" },
-  { value: "Federal", label: "Federal" },
-  { value: "Estadual", label: "Estadual" },
-  { value: "Municipal", label: "Municipal" },
+const OPCOES_STATUS_REPASSE = [
+  { value: "", label: "Todos os Status" },
+  { value: "Concluído (AUDESP)", label: "✅ Concluído (AUDESP)" },
+  { value: "Em Prestação de Contas", label: "📊 Em Prestação de Contas" },
+  { value: "Em Execução", label: "⚙️ Em Execução" },
+  { value: "Em Formalização", label: "📝 Em Formalização" },
 ];
 
 const anoAtual = new Date().getFullYear();
@@ -32,8 +23,7 @@ const OPCOES_ANO = [
 
 export interface FiltrosAtivos {
   ano: string;
-  categoria: string;
-  esfera: string;
+  status: string;
   autor: string;
   entidade: string;
   cnpj: string;
@@ -192,18 +182,14 @@ export function PainelBuscaUnificado({
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3">
-              <FiltroSelect
-                label="Categoria"
-                value={filtrosAtivos.categoria}
-                onChange={(v) => handleChange("categoria", v)}
-                options={OPCOES_CATEGORIA}
-              />
-              <FiltroSelect
-                label="Esfera"
-                value={filtrosAtivos.esfera}
-                onChange={(v) => handleChange("esfera", v)}
-                options={OPCOES_ESFERA}
-              />
+              <div className="col-span-2 sm:col-span-3 md:col-span-2 lg:col-span-2">
+                <FiltroSelect
+                  label="Status do Repasse"
+                  value={filtrosAtivos.status}
+                  onChange={(v) => handleChange("status", v)}
+                  options={OPCOES_STATUS_REPASSE}
+                />
+              </div>
               <FiltroSelect
                 label="Ano"
                 value={filtrosAtivos.ano}
@@ -491,42 +477,39 @@ function ActiveFiltersChips({
 }) {
   const LABELS: Record<string, string> = {
     ano: "Ano",
-    categoria: "Categoria",
-    esfera: "Esfera",
+    status: "Status",
     autor: "Autor",
     entidade: "Entidade",
     cnpj: "CNPJ",
-  };
-
-  const CATEGORIA_LABELS: Record<string, string> = {
-    saude: "Saúde",
-    terceiro_setor: "Terceiro Setor",
-    obras: "Obras",
-    educacao: "Educação",
-    agricultura: "Agricultura",
-    esporte: "Esporte",
   };
 
   const ativos = Object.entries(filtrosAtivos).filter(([, v]) => Boolean(v));
 
   return (
     <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-border">
-      {ativos.map(([chave, valor]) => (
-        <span
-          key={chave}
-          className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 pl-2.5 pr-1 py-0.5 text-[11px] font-medium text-primary border border-primary/20"
-        >
-          <span className="opacity-70">{LABELS[chave]}:</span>
-          {chave === "categoria" ? (CATEGORIA_LABELS[valor] ?? valor) : valor}
-          <button
-            onClick={() => onRemove(chave)}
-            className="ml-0.5 grid h-4 w-4 place-items-center rounded-full hover:bg-primary/20 transition-colors"
-            aria-label={`Remover filtro ${LABELS[chave]}`}
+      {ativos.map(([chave, valor]) => {
+        let displayValue = valor;
+        if (chave === "cnpj") {
+          displayValue = valor.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+        }
+        
+        return (
+          <span
+            key={chave}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 pl-2.5 pr-1 py-0.5 text-[11px] font-medium text-primary border border-primary/20"
           >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
+            <span className="opacity-70">{LABELS[chave]}:</span>
+            {displayValue}
+            <button
+              onClick={() => onRemove(chave)}
+              className="ml-0.5 grid h-4 w-4 place-items-center rounded-full hover:bg-primary/20 transition-colors"
+              aria-label={`Remover filtro ${LABELS[chave]}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
 }
