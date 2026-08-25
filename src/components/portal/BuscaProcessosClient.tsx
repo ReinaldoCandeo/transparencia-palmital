@@ -163,6 +163,7 @@ export default function BuscaProcessosClient({
                 <th className="px-4 py-3">Assunto</th>
                 <th className="px-4 py-3">Data</th>
                 <th className="px-4 py-3">Autor</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 sr-only">Ações</th>
               </tr>
             </thead>
@@ -191,6 +192,9 @@ export default function BuscaProcessosClient({
                   </td>
                   <td className="px-4 py-4 text-foreground font-medium">
                     {getAutorEmenda(p)}
+                  </td>
+                  <td className="px-4 py-4">
+                    <StatusBadge status={p.situacao_atual || "Em Formalização"} />
                   </td>
                   <td className="px-4 py-4 text-right">
                     <Link
@@ -223,10 +227,13 @@ export default function BuscaProcessosClient({
               key={p.hash}
               className="rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-5 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <span className="font-mono text-sm font-semibold text-foreground">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <span className="font-mono text-sm font-semibold text-foreground truncate max-w-[50%]">
                   {p.num_formatado}
                 </span>
+                <div className="shrink-0">
+                  <StatusBadge status={p.situacao_atual || "Em Formalização"} />
+                </div>
               </div>
               <Link
                 href={`/processos/${p.hash}`}

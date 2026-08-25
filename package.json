@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "sync:carga-inicial": "tsx --env-file=.env.local scripts/carga-inicial-storage.ts"
+    "sync:carga-inicial": "tsx --env-file=.env.local scripts/carga-inicial-storage.ts",
+    "sync:force-all": "tsx --env-file=.env.local scripts/force-resync-all.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
