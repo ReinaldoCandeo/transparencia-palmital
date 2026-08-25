@@ -606,8 +606,10 @@ export async function obterDetalheInterno(hash: string): Promise<ProcessoPublico
     // ── FASE 3: Deduplicação e sanitização
     if (processoBase.movimentacoes && processoBase.movimentacoes.length > 0) {
       const uniqueMovs = new Map();
+      let fallbackCounter = 0;
       for (const mov of processoBase.movimentacoes) {
-        uniqueMovs.set(mov.id_emissao_evento, mov);
+        const key = mov.id_emissao_evento || `fallback_${fallbackCounter++}`;
+        uniqueMovs.set(key, mov);
       }
       (processoBase as any).movimentacoes = Array.from(uniqueMovs.values());
     }

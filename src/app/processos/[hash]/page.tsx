@@ -294,22 +294,22 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
   let currentEtapa: any = null;
 
   // Processa da movimentação mais antiga para a mais nova
-  const movsInvertidas = [...movimentacoes].reverse();
-
-  for (const mov of movsInvertidas) {
+  // Como `movimentacoes` já foi ordenado por `timeA - timeB` (crescente / mais antigas primeiro),
+  // podemos iterar diretamente sobre ele!
+  for (const mov of movimentacoes) {
     const nome = String(mov.evento || "").toLowerCase();
     const isEtapa = nome.includes("etapa ");
     const hasAnexo = Array.isArray(mov.anexos) && mov.anexos.length > 0;
 
     if (isEtapa) {
       currentEtapa = { ...mov, anexos: Array.isArray(mov.anexos) ? [...mov.anexos] : [] };
-      // unshift para manter a ordem final do mais recente para o mais antigo
-      timelineSemantica.unshift(currentEtapa);
+      // push para manter a ordem cronológica do mais antigo para o mais recente
+      timelineSemantica.push(currentEtapa);
     } else if (hasAnexo) {
       if (currentEtapa) {
         currentEtapa.anexos.push(...mov.anexos);
       } else {
-        timelineSemantica.unshift({ ...mov, anexos: [...mov.anexos] });
+        timelineSemantica.push({ ...mov, anexos: [...mov.anexos] });
       }
     }
   }
