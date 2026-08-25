@@ -269,6 +269,9 @@ export function isAnexoSensivel(filename: string | null | undefined): boolean {
   // Normaliza o nome do arquivo (remove acentos, deixa em minúsculo)
   const limpo = removeAcentos(filename).toLowerCase();
 
+  // Bloqueio blindado exato: se contiver "dados sensíveis"
+  if (limpo.includes("dados sensiveis")) return true;
+
   // Expressão Regular com Word Boundaries (\b) para a Blocklist Oficial Atualizada.
   // Evita falsos positivos como "comprovante_cpfl_energia.pdf"
   const regexSensivel = /\b(rg|cpf|cnh|obito|documento pessoal|identidade|carteira de trabalho|ctps|titulo de eleitor|passaporte|holerite|cns|cartao do sus|residencia|endereco|nascimento|casamento)\b/i;

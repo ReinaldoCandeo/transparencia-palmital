@@ -36,14 +36,11 @@ export const ASSUNTOS_TERCEIRO_SETOR = new Set([
   1915763, // Terceiro Setor - Emendas Municipais - EDUCAÇÃO E CULTURA
   1915772, // Terceiro Setor - Emendas Municipais - ESPORTE
   1915764, // Terceiro Setor - Emendas Municipais - SAÚDE
+  1915792, // Terceiro Setor Repasses - padrão
 ]);
 
 /** União de todos os assuntos aceitos pelo portal (porteira de ingestão) */
 export const ASSUNTOS_EMENDA = new Set([
-  ...ASSUNTOS_SAUDE,
-  ...ASSUNTOS_OBRAS,
-  ...ASSUNTOS_AGRICULTURA,
-  ...ASSUNTOS_EDUCACAO,
   ...ASSUNTOS_TERCEIRO_SETOR,
 ]);
 

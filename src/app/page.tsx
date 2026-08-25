@@ -17,10 +17,8 @@ export default async function PaginaBuscaProcessos({
   const anoBruto = parseInt(params.ano as string, 10);
   const ano =
     !isNaN(anoBruto) && anoBruto > 2000 && anoBruto < 2100 ? anoBruto : null;
-  const categoria =
-    typeof params.categoria === "string" ? params.categoria : undefined;
-  const esfera =
-    typeof params.esfera === "string" ? params.esfera : undefined;
+  const status =
+    typeof params.status === "string" ? params.status : undefined;
 
   // 🔒 BLINDAGEM 2: Normaliza o texto do autor antes de enviar ao Supabase,
   // igualando o formato com o que está salvo em search_autores (sem acentos, lowercase).
@@ -59,9 +57,11 @@ export default async function PaginaBuscaProcessos({
     .order("hora", { ascending: false })
     .range(start, end);
 
+  // 🔒 BLINDAGEM 6: Hard-filter para exibir apenas Terceiro Setor
+  query = query.eq("search_categoria", "terceiro_setor");
+
   if (ano) query = query.eq("search_ano", ano);
-  if (categoria) query = query.eq("search_categoria", categoria);
-  if (esfera) query = query.eq("search_esfera", esfera);
+  if (status) query = query.eq("situacao_atual", status);
   if (autor)
     query = query.textSearch("search_autores", autor, {
       type: "websearch",
@@ -86,8 +86,7 @@ export default async function PaginaBuscaProcessos({
   // Filtros ativos passados para o Client Component (para inicializar os selects corretamente)
   const filtrosAtivos = {
     ano: ano?.toString() ?? "",
-    categoria: categoria ?? "",
-    esfera: esfera ?? "",
+    status: status ?? "",
     autor: autorBruto ?? "",
     entidade: entidadeBruta ?? "",
     cnpj: cnpjBruto ?? "",
