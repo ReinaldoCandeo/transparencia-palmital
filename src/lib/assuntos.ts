@@ -37,6 +37,7 @@ export const ASSUNTOS_TERCEIRO_SETOR = new Set([
   1915772, // Terceiro Setor - Emendas Municipais - ESPORTE
   1915764, // Terceiro Setor - Emendas Municipais - SAÚDE
   1915792, // Terceiro Setor Repasses - padrão
+  1915796, // Terceiro Setor Repasses - SOCIAL (Nova Modalidade)
 ]);
 
 /** União de todos os assuntos aceitos pelo portal (porteira de ingestão) */

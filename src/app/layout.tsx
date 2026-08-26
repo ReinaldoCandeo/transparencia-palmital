@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/Providers";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,6 +19,27 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        
+        {/* VLibras Widget */}
+        <div {...{ vw: "true" }} className="enabled">
+          <div {...{ "vw-access-button": "true" }} className="active"></div>
+          <div {...{ "vw-plugin-wrapper": "true" }}>
+            <div className="vw-plugin-top-wrapper"></div>
+          </div>
+        </div>
+        <Script src="https://vlibras.gov.br/app/vlibras-plugin.js" strategy="afterInteractive" />
+        <Script id="vlibras-init" strategy="afterInteractive" dangerouslySetInnerHTML={{
+          __html: `
+            const initVLibras = () => {
+              if (window.VLibras) {
+                new window.VLibras.Widget('https://vlibras.gov.br/app');
+              } else {
+                setTimeout(initVLibras, 500);
+              }
+            };
+            initVLibras();
+          `
+        }} />
       </body>
     </html>
   );

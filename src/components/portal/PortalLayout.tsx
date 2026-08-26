@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Moon, Sun, Scale } from "lucide-react";
+import { Building2, Moon, Sun, Scale, Menu, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 export function PortalLayout({ children }: { children: ReactNode }) {
   const [dark, setDark] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("portal-theme");
@@ -21,6 +22,48 @@ export function PortalLayout({ children }: { children: ReactNode }) {
     localStorage.setItem("portal-theme", next ? "dark" : "light");
   };
 
+  const NavLinks = () => (
+    <>
+      <Link
+        href="/"
+        className="block rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        Consulta Pública
+      </Link>
+      <Link
+        href="/entidades"
+        className="block rounded-md px-3 py-2 text-emerald-600 font-medium hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 transition-colors"
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        Terceiro Setor
+      </Link>
+      <Link
+        href="/privacidade"
+        className="block rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        LAI / LGPD
+      </Link>
+      <Link
+        href="/acessibilidade"
+        className="block rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        Acessibilidade
+      </Link>
+      <a
+        href={process.env.NEXT_PUBLIC_ESIC_URL || "#"}
+        target={process.env.NEXT_PUBLIC_ESIC_URL ? "_blank" : "_self"}
+        rel="noopener noreferrer"
+        className="block rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        e-SIC
+      </a>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Faixa institucional */}
@@ -34,8 +77,8 @@ export function PortalLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Cabeçalho */}
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-4 sm:flex sm:justify-between">
+      <header className="border-b border-border bg-card relative">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm">
               <Building2 className="h-6 w-6" />
@@ -50,42 +93,47 @@ export function PortalLayout({ children }: { children: ReactNode }) {
             </div>
           </Link>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <nav className="hidden md:flex items-center gap-1 text-sm">
-              <Link
-                href="/"
-                className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                Consulta Pública
-              </Link>
-              <Link
-                href="/entidades"
-                className="rounded-md px-3 py-2 text-emerald-600 font-medium hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 transition-colors"
-              >
-                Terceiro Setor
-              </Link>
-              <a
-                href="#lgpd"
-                className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                LAI / LGPD
-              </a>
-              <a
-                href="#"
-                className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                e-SIC
-              </a>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex shrink-0 items-center gap-2">
+            <nav className="flex items-center gap-1 text-sm">
+              <NavLinks />
             </nav>
             <button
               onClick={toggle}
               aria-label="Alternar tema"
-              className="grid h-9 w-9 place-items-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
+              className="ml-2 grid h-9 w-9 place-items-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
             >
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
           </div>
+
+          {/* Mobile Actions */}
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              onClick={toggle}
+              aria-label="Alternar tema"
+              className="grid h-10 w-10 place-items-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
+            >
+              {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Menu"
+              className="grid h-10 w-10 place-items-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-border bg-card px-4 py-4 absolute w-full shadow-lg z-50">
+            <nav className="flex flex-col gap-2 text-sm font-medium">
+              <NavLinks />
+            </nav>
+          </div>
+        )}
       </header>
 
       <main>{children}</main>
