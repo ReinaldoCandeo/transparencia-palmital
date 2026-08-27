@@ -118,7 +118,8 @@ export function PortalLayout({ children }: { children: ReactNode }) {
             </button>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Menu"
+              aria-label="Menu principal"
+              aria-expanded={isMobileMenuOpen}
               className="grid h-10 w-10 place-items-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

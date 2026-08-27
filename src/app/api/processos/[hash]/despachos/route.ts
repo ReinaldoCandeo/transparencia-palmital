@@ -12,25 +12,19 @@ export async function GET(
   const secret = process.env.CRON_SECRET;
   
   if (!secret || authHeader !== `Bearer ${secret}`) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { hash } = await params;
   const processo = await buscarDetalhe(hash);
 
   if (!processo) {
-    return Response.json(
-      { error: "Processo não encontrado ou indisponível na 1Doc." },
-      { status: 404 }
-    );
+    return Response.json({ error: "Not Found" }, { status: 404 });
   }
 
   // Validação adicional: Expor apenas processos que pertencem ao escopo do Portal da Transparência
   if (!ASSUNTOS_EMENDA.has(processo.id_assunto)) {
-    return Response.json(
-      { error: "Processo fora do escopo de transparência." },
-      { status: 403 }
-    );
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   return Response.json(processo);
