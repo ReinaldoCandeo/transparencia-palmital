@@ -35,7 +35,12 @@ export async function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/admin') && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Preserva cookies (ex: Supabase auth) e headers que já estavam na supabaseResponse
+    supabaseResponse.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    supabaseResponse = redirectResponse;
   }
 
   // 100% Edge-Compatible: Evitamos o Buffer (Node API) 
