@@ -45,11 +45,11 @@ export async function proxy(request: NextRequest) {
   // Constrói a política Strict CSP com permissões para o VLibras
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'strict-dynamic' https://*.vlibras.gov.br https://vlibras.gov.br https://cdn.jsdelivr.net 'unsafe-eval';
+    script-src 'self' 'nonce-${nonce}' 'unsafe-inline' 'strict-dynamic' https://*.vlibras.gov.br https://vlibras.gov.br https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com 'unsafe-eval';
     style-src 'self' 'unsafe-inline' https://*.vlibras.gov.br https://vlibras.gov.br https://fonts.googleapis.com https://cdn.jsdelivr.net;
-    img-src 'self' blob: data: https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net;
+    img-src 'self' blob: data: https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com;
     font-src 'self' https://*.vlibras.gov.br https://vlibras.gov.br https://fonts.gstatic.com https://cdn.jsdelivr.net;
-    connect-src 'self' https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net;
+    connect-src 'self' https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com;
     worker-src 'self' blob:;
     child-src 'self' blob: https://vlibras.gov.br https://*.vlibras.gov.br;
     frame-src 'self' https://vlibras.gov.br https://*.vlibras.gov.br;
