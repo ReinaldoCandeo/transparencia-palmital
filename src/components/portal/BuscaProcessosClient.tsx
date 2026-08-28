@@ -7,6 +7,7 @@ import {
   ArrowRight,
   FileText,
   ShieldCheck,
+  Download,
 } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 import { PortalLayout } from "@/components/portal/PortalLayout";
@@ -85,6 +86,45 @@ export default function BuscaProcessosClient({
   const router = useRouter();
   const pathname = usePathname();
 
+  const exportarCSV = () => {
+    if (!processos || processos.length === 0) return;
+
+    const colunas = [
+      "Numero",
+      "Ano",
+      "Data",
+      "Assunto",
+      "Autor (Setor/Nome)",
+      "Status",
+      "Link",
+    ];
+    
+    const linhas = processos.map(p => {
+      const dataStr = formatDateBR(p.data);
+      const autorName = getAutorEmenda(p);
+      
+      return [
+        p.num || "",
+        p.ano || "",
+        dataStr,
+        `"${String(p.assunto || "").replace(/"/g, '""')}"`,
+        `"${String(autorName || "").replace(/"/g, '""')}"`,
+        `"${String(p.situacao_atual || "").replace(/"/g, '""')}"`,
+        `${window.location.origin}/processos/${p.hash}`
+      ].join(",");
+    });
+
+    const csvContent = [colunas.join(","), ...linhas].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `processos_pagina_${paginaAtual}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <PortalLayout>
       {/* Hero de Busca Exata (Client Action) */}
@@ -152,6 +192,14 @@ export default function BuscaProcessosClient({
               {totalProcessos} processo{totalProcessos !== 1 ? "s" : ""} encontrado{totalProcessos !== 1 ? "s" : ""}
             </p>
           </div>
+          {processos.length > 0 && (
+            <button
+              onClick={exportarCSV}
+              className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground shadow-sm transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <Download className="h-4 w-4" /> Exportar CSV da Página
+            </button>
+          )}
         </div>
 
         {/* Tabela (desktop) */}

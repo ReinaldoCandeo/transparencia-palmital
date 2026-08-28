@@ -58,7 +58,7 @@ const WHITELIST_MUNICIPAL = new Set([
   "ano de execucao", "autor", "lei", "portaria", "tipo", "gnd",
   "valor", "data de aprovacao", "entidade beneficiada", "cnpj da entidade",
   "orgao concessor", "cnpj do orgao", "localidade beneficiada",
-  "justificativa", "observacoes"
+  "justificativa"
 ]);
 
 const CAMPOS_DESTACADOS_MUNICIPAL = new Set([
@@ -648,16 +648,7 @@ export function EmendaMunicipalBlock({
           </div>
         )}
 
-        {/* Observações do Processo */}
-        {conteudo && conteudo.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, '').trim() !== '' && (
-          <div className="border-t pt-5">
-            <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-              <ScrollText className="h-3.5 w-3.5" /> Observações do Processo
-            </h4>
-            <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/80 leading-relaxed" 
-                 dangerouslySetInnerHTML={{ __html: conteudo }} />
-          </div>
-        )}
+
       </div>
     </div>
   );

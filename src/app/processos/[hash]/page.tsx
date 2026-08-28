@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import Link from "next/link";
+import { Breadcrumbs } from "@/components/portal/Breadcrumbs";
 import {
   ArrowLeft,
   Calendar,
@@ -157,14 +159,57 @@ function SubprocessosBlock({
   );
 }
 
+export async function generateMetadata({ params }: { params: Promise<{ hash: string }> }): Promise<Metadata> {
+  const { hash } = await params;
+  
+  let { data: p } = await supabase
+    .from("processos_emendas")
+    .select("num, num_formatado, assunto, search_entidade")
+    .eq("hash", hash)
+    .single();
+
+  if (!p) {
+    // Tenta buscar live se for um processo filho recém-clicado que não está no banco
+    const { buscarDetalhe } = await import("@/lib/onedoc");
+    const docData = await buscarDetalhe(hash);
+    if (docData) {
+      p = flattenProcessoParaRow(docData) as any;
+    }
+  }
+
+  if (!p) {
+    return { title: "Processo não encontrado | Portal da Transparência" };
+  }
+
+  const entidade = p.search_entidade ? ` — ${p.search_entidade}` : '';
+  const num = p.num_formatado || p.num || "Sem número";
+
+  return {
+    title: `Processo ${num}${entidade} | Portal da Transparência`,
+    description: p.assunto || "Consulta pública de processo administrativo",
+  };
+}
+
 export default async function DetalhesProcesso({ params }: { params: Promise<{ hash: string }> }) {
   const { hash } = await params;
 
-  const { data: p } = await supabase
+  let { data: p } = await supabase
     .from("processos_emendas")
     .select("*")
     .eq("hash", hash)
     .single();
+
+  let isLiveChild = false;
+  
+  if (!p) {
+    const { buscarDetalhe } = await import("@/lib/onedoc");
+    const docData = await buscarDetalhe(hash);
+    
+    if (docData) {
+      p = flattenProcessoParaRow(docData) as any;
+      isLiveChild = true;
+    }
+  }
 
   if (!p) {
     return (
@@ -179,11 +224,24 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
     );
   }
 
+  // Busca do Processo Pai (Caminho de Volta)
+  let parentProcesso = null;
+  if (p.id_emissao_base) {
+    const { data } = await supabaseAdmin
+      .from("processos_emendas")
+      .select("hash, num_formatado, num, ano, assunto, situacao_atual")
+      .eq("id_emissao", p.id_emissao_base)
+      .single();
+    if (data) {
+      parentProcesso = data;
+    }
+  }
+
   // Verifica se devemos fazer SWR (TTL de 3 dias)
   const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
   const ultimaSinc = p.ultima_sincronizacao ? new Date(p.ultima_sincronizacao).getTime() : 0;
   const agora = Date.now();
-  const deveSincronizar = agora - ultimaSinc > tresDiasMs;
+  const deveSincronizar = isLiveChild || (agora - ultimaSinc > tresDiasMs);
 
   if (deveSincronizar) {
     after(async () => {
@@ -192,7 +250,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
           `[SWR] Iniciando sync reativo (TTL) para o processo ${p.num}/${p.ano} (hash: ${hash})`,
         );
 
-        const result = await syncProcessByHash(hash);
+        const result = await syncProcessByHash(hash, 50000, undefined, isLiveChild);
 
         if (!result) {
           console.error(`[SWR] Falha no sync-core do hash: ${hash}`);
@@ -239,7 +297,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
     if (seenAnexos.has(key)) return false;
     seenAnexos.add(key);
     return true;
-  });
+  }).filter((a: any) => !!a.url_storage);
 
   // Buscar subprocessos (onde id_emissao_base == p.id_emissao)
   const { data: subprocessos } = await supabase
@@ -272,21 +330,45 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
     const extractedHashes = Array.from(hashesEncontrados);
 
     if (extractedHashes.length > 0) {
-      // Agora consultamos diretamente no Banco de Dados (muito mais rápido, gerido pelo Cron)
+      // 1. Busca primeiro os que já estão no banco de dados (mais rápido)
       const { data: dbVinculados } = await supabaseAdmin
         .from("processos_emendas")
         .select("hash, num_formatado, num, ano, assunto, situacao_atual")
         .in("hash", extractedHashes);
 
-      if (dbVinculados) {
-        const subHashes = new Set(subprocessos?.map((s) => s.hash) || []);
-        vinculadosHtml = dbVinculados
-          .filter((v) => !subHashes.has(v.hash))
-          .map((v) => ({
-            ...v,
-            situacao_atual_str: v.situacao_atual, // Normaliza para o componente
-          }));
+      const dbHashes = new Set(dbVinculados?.map(v => v.hash) || []);
+      const missingHashes = extractedHashes.filter(h => !dbHashes.has(h));
+
+      // 2. Busca ao vivo na 1Doc os que não estão no nosso DB
+      let liveVinculados: any[] = [];
+      if (missingHashes.length > 0) {
+        // Import Dinâmico só se precisar (evita erro de circular ref se houver)
+        const { buscarDetalhe } = await import("@/lib/onedoc");
+        const liveResults = await Promise.all(
+          missingHashes.map(async (h) => {
+            const p = await buscarDetalhe(h);
+            return p ? {
+              hash: p.hash,
+              num_formatado: p.num_formatado,
+              num: p.num,
+              ano: p.ano,
+              assunto: p.assunto,
+              situacao_atual: p.situacao_atual_str
+            } : null;
+          })
+        );
+        liveVinculados = liveResults.filter(Boolean);
       }
+
+      const todosVinculados = [...(dbVinculados || []), ...liveVinculados];
+
+      const subHashes = new Set(subprocessos?.map((s) => s.hash) || []);
+      vinculadosHtml = todosVinculados
+        .filter((v) => !subHashes.has(v.hash))
+        .map((v) => ({
+          ...v,
+          situacao_atual_str: v.situacao_atual, // Normaliza para o componente
+        }));
     }
   }
   // Timeline Semântica (Filtro e Agrupamento de Anexos)
@@ -331,19 +413,20 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
       <div className="bg-muted/30">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:py-12">
           {parentHash ? (
-            <Link
-              href={`/processos/${parentHash}`}
-              className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-            >
-              <ArrowLeft className="h-4 w-4" /> Voltar para o Processo Pai
-            </Link>
+            <Breadcrumbs 
+              items={[
+                { label: "Processos", href: "/" },
+                { label: "Processo Pai", href: `/processos/${parentHash}` },
+                { label: `Processo ${p.num_formatado || "Sem número"}` }
+              ]} 
+            />
           ) : (
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" /> Voltar para busca
-            </Link>
+            <Breadcrumbs 
+              items={[
+                { label: "Processos", href: "/" },
+                { label: `Processo ${p.num_formatado || "Sem número"}` }
+              ]} 
+            />
           )}
 
           <div className="mt-6 space-y-6">
@@ -450,6 +533,37 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
                     <EmendaMunicipalBlock formData={p.form_data || []} conteudo={p.conteudo} />
                   )}
               </>
+            )}
+
+            {/* Processo Principal / Caminho de Volta */}
+            {parentProcesso && (
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6 shadow-sm sm:p-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-primary mb-4">
+                  <ArrowLeft className="h-5 w-5" /> Processo Principal (Origem)
+                </h3>
+                <div className="rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-md">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h4 className="font-medium text-foreground">
+                        {parentProcesso.num_formatado || `Processo ${parentProcesso.num}/${parentProcesso.ano}`}
+                      </h4>
+                      <p className="mt-1 text-sm text-muted-foreground line-clamp-1">
+                        {parentProcesso.assunto}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <StatusBadge status={parentProcesso.situacao_atual} />
+                      <Link
+                        href={`/processos/${parentProcesso.hash}`}
+                        className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        Ver Processo Pai
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Bloco de Subprocessos e Vinculados HTML */}
