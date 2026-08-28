@@ -32,6 +32,13 @@ export function PortalLayout({ children }: { children: ReactNode }) {
         Consulta Pública
       </Link>
       <Link
+        href="/dashboard"
+        className="block rounded-md px-3 py-2 text-blue-600 font-medium hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        Dashboard
+      </Link>
+      <Link
         href="/entidades"
         className="block rounded-md px-3 py-2 text-emerald-600 font-medium hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/30 transition-colors"
         onClick={() => setIsMobileMenuOpen(false)}

@@ -164,6 +164,7 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
         {
           cnpj: result.data.search_cnpj,
           nome_oficial: result.data.search_entidade,
+          apelido: result.data.search_entidade || "DESCONHECIDO", // fallback garantido
         },
         {
           onConflict: "cnpj",

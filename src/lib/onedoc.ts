@@ -30,6 +30,7 @@ interface OnedocAnexo {
 export const OnedocProcessoSchema = z.object({
   id_emissao: z.string().optional(),
   id_emissao_base: z.string().optional(),
+  id_emissao_pai: z.string().optional(),
   num: z.coerce.number(),
   ano: z.coerce.number(),
   num_formatado: z.string().optional(),
@@ -340,21 +341,16 @@ export {
 
 export function extractVinculadosHashesFromHtml(html: string): string[] {
   if (!html) return [];
-  const hashes: string[] = [];
-  try {
-    const aTags = html.match(/<a\s[^>]+>/gi) || [];
-    for (const aTag of aTags) {
-      if (aTag.includes('data-tipo="2"') || aTag.includes('mention_2')) {
-        const hashMatch = aTag.match(/hash=([a-zA-Z0-9]+)/i);
-        if (hashMatch && hashMatch[1]) {
-          hashes.push(hashMatch[1]);
-        }
-      }
-    }
-  } catch (err) {
-    console.error("[1Doc] Erro silencioso na extração de vínculos HTML:", err);
+  // A API da 1Doc pode enviar links no formato: href="...?hash=476AA5BA439BB..."
+  // ou com html entities href="...&amp;hash=476AA5BA..."
+  // ou através de atributos data-hash="...". Esta regex captura todas as formas.
+  const regex = /(?:data-hash=["']|[\?&]hash=|&amp;hash=)([a-fA-F0-9]{24})(?:["'&]|&amp;)/gi;
+  const hashes = new Set<string>();
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    if (match[1]) hashes.add(match[1].toUpperCase());
   }
-  return hashes;
+  return Array.from(hashes);
 }
 
 function calcularStatusSemantico(situacaoOriginal: string, movimentacoes: any[]): string {
@@ -391,7 +387,7 @@ function sanitizarProcesso(p: OnedocProcesso): ProcessoPublico {
 
   return {
     id_emissao: p.id_emissao || "",
-    id_emissao_base: p.id_emissao_base || undefined,
+    id_emissao_base: (p.id_emissao_pai && p.id_emissao_pai !== "0") ? p.id_emissao_pai : (p.id_emissao_base || undefined),
     hash: p.hash,
     num: String(p.num),
     ano: String(p.ano),
