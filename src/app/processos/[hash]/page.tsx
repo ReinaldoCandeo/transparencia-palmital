@@ -241,7 +241,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
   const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
   const ultimaSinc = p.ultima_sincronizacao ? new Date(p.ultima_sincronizacao).getTime() : 0;
   const agora = Date.now();
-  const deveSincronizar = !isLiveChild && (agora - ultimaSinc > tresDiasMs);
+  const deveSincronizar = isLiveChild || (agora - ultimaSinc > tresDiasMs);
 
   if (deveSincronizar) {
     after(async () => {
@@ -250,7 +250,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
           `[SWR] Iniciando sync reativo (TTL) para o processo ${p.num}/${p.ano} (hash: ${hash})`,
         );
 
-        const result = await syncProcessByHash(hash);
+        const result = await syncProcessByHash(hash, 50000, undefined, isLiveChild);
 
         if (!result) {
           console.error(`[SWR] Falha no sync-core do hash: ${hash}`);
@@ -297,7 +297,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
     if (seenAnexos.has(key)) return false;
     seenAnexos.add(key);
     return true;
-  });
+  }).filter((a: any) => !!a.url_storage);
 
   // Buscar subprocessos (onde id_emissao_base == p.id_emissao)
   const { data: subprocessos } = await supabase

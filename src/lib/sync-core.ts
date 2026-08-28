@@ -13,7 +13,7 @@ import { supabaseAdmin } from "@/lib/db-admin";
  * @param timeoutMs Limite opcional de tempo para downloads sequenciais, em milissegundos
  * @returns O Processo processado ou `null` se der falha ou timeout completo
  */
-export async function syncProcessByHash(hash: string, timeoutMs: number = 50000, forceIdEmissaoBase?: string) {
+export async function syncProcessByHash(hash: string, timeoutMs: number = 50000, forceIdEmissaoBase?: string, bypassGatekeeper: boolean = false) {
   const syncStartTime = Date.now();
   let timeExceeded = false;
 
@@ -23,12 +23,6 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   const detalheCompleto = await obterDetalheInterno(hash);
   if (!detalheCompleto) {
     console.error(`[CORE] Erro ao buscar detalhes na 1Doc. Hash: ${hash}`);
-    return null;
-  }
-
-  const CUTOFF_DATE = new Date("2026-07-01T00:00:00Z");
-  if (new Date(detalheCompleto.data) < CUTOFF_DATE) {
-    console.log(`[CORE] Processo ${hash} ignorado: Data de emissão (${detalheCompleto.data}) é anterior ao limite (01/07/2026).`);
     return null;
   }
 
@@ -47,7 +41,10 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
     .eq("hash", hash)
     .single();
 
-  if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto)) {
+  if (bypassGatekeeper) {
+    console.log(`[CORE] Bypass Autorizado (Forçado pelo SWR Live Fetch).`);
+    isEmendaOuSubprocesso = true;
+  } else if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto)) {
     isEmendaOuSubprocesso = true;
   } else if (detalheCompleto.id_emissao_base) {
     // É um subprocesso potencial. Vamos checar se o Processo Pai existe no banco.
@@ -72,6 +69,17 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   if (!isEmendaOuSubprocesso) {
     console.log(`[CORE] Processo ${hash} rejeitado: Não é Emenda nem Subprocesso válido.`);
     return null;
+  }
+
+  // --- CUTOFF DATE APENAS PARA EMENDAS NOVAS (PAI) ---
+  // Subprocessos podem ser mais antigos que a emenda (ex: licitações iniciadas antes do repasse).
+  // Se o processo já está no DB (dbData), ignoramos o cutoff para permitir resyncs.
+  if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto) && !dbData) {
+    const CUTOFF_DATE = new Date("2026-07-01T00:00:00Z");
+    if (new Date(detalheCompleto.data) < CUTOFF_DATE) {
+      console.log(`[CORE] Processo ${hash} ignorado: Data de emissão (${detalheCompleto.data}) é anterior ao limite (01/07/2026).`);
+      return null;
+    }
   }
   // ------------------------------------------------------
 
