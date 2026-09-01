@@ -400,13 +400,49 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
   const formData = p.form_data || [];
   const rateios = buildRateioTable(formData, p.conteudoSemHtml);
   const valorGlobal = rateios.reduce((acc, r) => acc + parseMoedaToNumber(r.valor), 0);
+  
+  // Extração Dinâmica do Formulário de Empenho (Retroativo)
+  let hasEmpenhoForm = formData.some((f: any) => f.label === "_has_empenho_form");
+  let banco = extractFromForm(formData, "empenho nome do banco") || extractFromForm(formData, "empenho banco");
+  let agencia = extractFromForm(formData, "empenho agencia");
+  let conta =
+    extractFromForm(formData, "empenho no da conta") ||
+    extractFromForm(formData, "empenho n da conta") ||
+    extractFromForm(formData, "empenho conta");
+  let valorRepassadoRaw = extractFromForm(formData, "empenho valor") || extractFromForm(formData, "empenho repasse");
 
-  const banco = extractFromForm(formData, "nome do banco") || extractFromForm(formData, "banco");
-  const agencia = extractFromForm(formData, "agencia");
-  const conta =
-    extractFromForm(formData, "no da conta") ||
-    extractFromForm(formData, "n. da conta") ||
-    extractFromForm(formData, "conta");
+  // Se não encontrou no formData consolidado, busca dinamicamente nas movimentações (retroatividade)
+  if (!hasEmpenhoForm && p.movimentacoes && Array.isArray(p.movimentacoes)) {
+    for (const mov of p.movimentacoes) {
+      const nomeEtapa = String(mov.nome_etapa || mov.evento || mov.tipo_movimentacao_str || "").toLowerCase();
+      if (nomeEtapa.includes("etapa 8") || nomeEtapa.includes("empenho")) {
+        const camposMovStr = mov.emissao_campos_adicionais_assunto;
+        if (camposMovStr) {
+          try {
+            const camposMov = JSON.parse(camposMovStr);
+            if (Array.isArray(camposMov) && camposMov.length > 0) {
+              hasEmpenhoForm = true;
+              for (const def of camposMov) {
+                if (!def.campo || !def.label) continue;
+                const labelNorm = def.label.toLowerCase();
+                const valorCru = mov[def.campo];
+                if (valorCru !== undefined && valorCru !== null && valorCru !== "") {
+                  if (labelNorm.includes("banco") && !banco) banco = String(valorCru).replace(/<[^>]+>/g, "").trim();
+                  if ((labelNorm.includes("agencia") || labelNorm.includes("agência")) && !agencia) agencia = String(valorCru).replace(/<[^>]+>/g, "").trim();
+                  if (labelNorm.includes("conta") && !conta) conta = String(valorCru).replace(/<[^>]+>/g, "").trim();
+                  if ((labelNorm.includes("valor") || labelNorm.includes("repasse")) && !valorRepassadoRaw) valorRepassadoRaw = String(valorCru).replace(/<[^>]+>/g, "").trim();
+                }
+              }
+            }
+          } catch (e) {
+            // ignora erro de parse
+          }
+        }
+      }
+    }
+  }
+
+  const valorRepassado = valorRepassadoRaw ? parseMoedaToNumber(valorRepassadoRaw) : 0;
 
   return (
     <PortalLayout>
@@ -466,26 +502,37 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
               </dl>
             </div>
 
-            {/* CABEÇALHO FINANCEIRO (Novo) */}
-            {(valorGlobal > 0 || banco || agencia || conta) && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-6 shadow-sm sm:p-8 dark:border-blue-900/50 dark:bg-blue-950/20">
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-800 dark:text-blue-300 mb-6">
-                  <Banknote className="h-5 w-5" /> Resumo Financeiro
+            {/* CABEÇALHO FINANCEIRO (Aparece somente se houver formulário na etapa de empenho) */}
+            {hasEmpenhoForm && (
+              <div className="rounded-xl border bg-card/50 p-6 shadow-sm backdrop-blur-sm sm:p-8">
+                <h3 className="flex items-center gap-2 text-lg font-semibold mb-6">
+                  <Banknote className="h-5 w-5 text-muted-foreground" /> Resumo Financeiro
                 </h3>
+                
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                   {valorGlobal > 0 && (
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
-                        Valor do Repasse
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Valor Indicado (Total Atual)
                       </dt>
-                      <dd className="mt-1 text-2xl font-bold text-blue-700 dark:text-blue-400">
+                      <dd className="mt-1 text-xl font-bold text-foreground">
                         {formatMoedaBR(valorGlobal)}
+                      </dd>
+                    </div>
+                  )}
+                  {valorRepassado > 0 && (
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Valor Realmente Repassado
+                      </dt>
+                      <dd className="mt-1 text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatMoedaBR(valorRepassado)}
                       </dd>
                     </div>
                   )}
                   {banco && (
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Banco
                       </dt>
                       <dd className="mt-1 text-base font-semibold text-foreground">{banco}</dd>
@@ -493,7 +540,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
                   )}
                   {agencia && (
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Agência
                       </dt>
                       <dd className="mt-1 text-base font-semibold text-foreground">{agencia}</dd>
@@ -501,7 +548,7 @@ export default async function DetalhesProcesso({ params }: { params: Promise<{ h
                   )}
                   {conta && (
                     <div>
-                      <dt className="text-xs font-semibold uppercase tracking-wider text-blue-600/70 dark:text-blue-400/70">
+                      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Conta
                       </dt>
                       <dd className="mt-1 text-base font-semibold text-foreground">{conta}</dd>

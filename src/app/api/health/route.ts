@@ -10,11 +10,25 @@ export async function GET() {
   const startTime = Date.now();
 
   try {
-    // Verifica conexão básica do Supabase (Client)
-    const { error: clientError } = await supabase.from('processos_emendas').select('id').limit(1);
+    // Verifica a data da última sincronização para garantir que o Cron está rodando
+    const { data: latestSyncData, error: clientError } = await supabase
+      .from('processos_emendas')
+      .select('ultima_sincronizacao')
+      .order('ultima_sincronizacao', { ascending: false })
+      .limit(1)
+      .single();
+
     if (clientError) throw new Error(`Supabase Client Error: ${clientError.message}`);
 
-    // Verifica conexão Supabase Admin (se tiver chaves)
+    const lastSyncDate = latestSyncData?.ultima_sincronizacao ? new Date(latestSyncData.ultima_sincronizacao) : new Date(0);
+    const hoursSinceLastSync = (Date.now() - lastSyncDate.getTime()) / (1000 * 60 * 60);
+
+    // Se passou mais de 24 horas sem sync, a aplicação (cron) não está saudável
+    if (hoursSinceLastSync > 24) {
+      throw new Error(`Stale Data: Última sincronização ocorreu há ${hoursSinceLastSync.toFixed(1)} horas.`);
+    }
+
+    // Verifica conexão Supabase Admin (opcional, só para ter certeza que as vars estão configuradas)
     const { error: adminError } = await supabaseAdmin.from('processos_emendas').select('id').limit(1);
     if (adminError) throw new Error(`Supabase Admin Error: ${adminError.message}`);
 
@@ -26,6 +40,7 @@ export async function GET() {
         timestamp: new Date().toISOString(),
         uptime: uptime,
         latencyMs: latency,
+        lastSync: lastSyncDate.toISOString(),
         system: {
           freemem: os.freemem(),
           totalmem: os.totalmem(),
