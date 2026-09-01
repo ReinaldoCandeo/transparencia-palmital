@@ -287,19 +287,37 @@ function extrairFormData(p: OnedocProcesso): { label: string; valor: string; tip
         if (camposMovStr) {
           try {
             const camposMov = JSON.parse(camposMovStr);
+            
+            // Flag para indicar que o formulário de empenho existe
+            formData.push({ label: "_has_empenho_form", valor: "true", tipo: "hidden" });
+
             for (const def of camposMov) {
               if (!def.campo || !def.label) continue;
               const labelStr = stripHtml(def.label);
               if (!labelStr) continue;
               
               const labelNorm = labelStr.toLowerCase();
-              // Extrair apenas os dados bancários (Banco, Agência, Conta)
-              if (labelNorm.includes("banco") || labelNorm.includes("agencia") || labelNorm.includes("agência") || labelNorm.includes("conta")) {
+              // Extrair banco, agencia, conta e valor repassado
+              if (
+                labelNorm.includes("banco") || 
+                labelNorm.includes("agencia") || 
+                labelNorm.includes("agência") || 
+                labelNorm.includes("conta") || 
+                labelNorm.includes("valor") ||
+                labelNorm.includes("repasse")
+              ) {
                 const valorCru = mov[def.campo];
                 if (valorCru !== undefined && valorCru !== null && valorCru !== "") {
+                  let valorFormatado = stripHtml(String(valorCru));
+                  
+                  // Formatar se for moeda
+                  if (def.tipo === "text" && valorFormatado.match(/^\d{1,3}(\.\d{3})*,\d{2}$/)) {
+                    valorFormatado = formatarMoeda(valorFormatado);
+                  }
+
                   formData.push({
-                    label: labelStr,
-                    valor: stripHtml(String(valorCru)),
+                    label: `[Empenho] ${labelStr}`,
+                    valor: valorFormatado,
                     tipo: def.tipo
                   });
                 }
@@ -359,12 +377,41 @@ function calcularStatusSemantico(situacaoOriginal: string, movimentacoes: any[])
   // Extrai todas as descrições de etapas em lower case para busca semântica
   const etapas = movimentacoes.map(m => String(m.nome_etapa || m.evento || m.tipo_movimentacao_str || "").toLowerCase());
 
-  // Ordem de precedência: de trás para frente no funil
-  if (etapas.some(e => e.includes("etapa 14"))) return "Concluído (AUDESP)";
-  if (etapas.some(e => e.includes("etapa 11") || e.includes("etapa 12") || e.includes("etapa 13"))) return "Em Prestação de Contas";
-  if (etapas.some(e => e.includes("etapa 10") || e.includes("execução") || e.includes("execucao"))) return "Em Execução";
+  // Ordem de precedência (funil de trás para frente):
+  // Se o processo já passou por uma etapa final, ele assume o status correspondente.
+
+  // 4. Concluído
+  if (etapas.some(e => 
+    e.includes("envio audesp") || 
+    e.includes("publicação prestação de contas") || 
+    e.includes("publicacao prestacao de contas") ||
+    e.includes("concluído (audesp)")
+  )) {
+    return "Concluído (AUDESP)";
+  }
+
+  // 3. Em Prestação de Contas
+  if (etapas.some(e => 
+    e.includes("prestação de contas final") || 
+    e.includes("prestacao de contas final") || 
+    e.includes("pareceres da prestação") || 
+    e.includes("pareceres da prestacao") ||
+    e.includes("documentos de acompanhamento")
+  )) {
+    return "Em Prestação de Contas";
+  }
+
+  // 2. Em Execução (Acompanhamento, Aditivos, Empenho)
+  if (etapas.some(e => 
+    e.includes("empenho") || 
+    e.includes("aditivos e alter") || 
+    e.includes("execução") || 
+    e.includes("execucao")
+  )) {
+    return "Em Execução";
+  }
   
-  // Se não chegou nas etapas de execução/prestação de contas, está em fase inicial
+  // 1. Em Formalização (Etapas 1 a 7: Cadastro, Impedimento, Viabilidade, Documentações, Autorização, Publicação inicial)
   return "Em Formalização";
 }
 

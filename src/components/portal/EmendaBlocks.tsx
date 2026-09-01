@@ -320,9 +320,25 @@ export function EmendaTerceiroSetorBlock({
   const lei = extractFromForm(formData, "lei") || extractFromForm(formData, "portaria");
   const numEspelho = extractFromForm(formData, "no espelho") || extractFromForm(formData, "n. espelho");
 
-  // Título específico por tipo de processo
-  const isEsporte = idAssunto === 1915759;
-  const titulo = isEsporte ? "Esporte — Destinação Direta" : "Terceiro Setor Social";
+  function getCategoriaTerceiroSetor(id?: number): string {
+    switch (id) {
+      case 1915739:
+      case 1915740:
+      case 1915796: return "Social";
+      case 1915759:
+      case 1915772:
+      case 1915800: return "Esporte";
+      case 1915774:
+      case 1915799: return "Agricultura e Meio Ambiente";
+      case 1915763:
+      case 1915798: return "Educação";
+      case 1915764:
+      case 1915801: return "Saúde";
+      default: return "Geral";
+    }
+  }
+
+  const categoria = getCategoriaTerceiroSetor(idAssunto);
 
   // Campos extras do grid (o que a whitelist aprovar e não está em destaque)
   const camposExtras = (formData || []).filter((item) => {
@@ -344,7 +360,12 @@ export function EmendaTerceiroSetorBlock({
             <Landmark className="h-6 w-6" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-bold text-blue-700 dark:text-blue-400">{titulo}</h3>
+            <h3 className="flex items-center gap-2 text-xl font-bold text-blue-700 dark:text-blue-400">
+              Terceiro Setor
+              <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+                {categoria}
+              </span>
+            </h3>
             {(modalidade || lei || numEspelho) && (
               <p className="mt-0.5 text-sm text-blue-600/80 dark:text-blue-400/70">
                 {[
