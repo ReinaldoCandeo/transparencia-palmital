@@ -11,7 +11,7 @@ export const ASSUNTOS_SAUDE = new Set([
   1915747, // Controle Interno de Emendas - SAÚDE
 ]);
 
-/** Controle interno de obras — forms legado e novo forms */
+/** Controle interno de obras - forms legado e novo forms */
 export const ASSUNTOS_OBRAS = new Set([
   1915780, // Emenda Parlamentar (Cadastro) - OBRAS [forms legado]
   1915790, // Emenda Parlamentar (nv) - OBRAS [novo forms]

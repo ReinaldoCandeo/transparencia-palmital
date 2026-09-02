@@ -37,6 +37,10 @@ export default async function PaginaBuscaProcessos({
     typeof params.cnpj === "string" ? params.cnpj.trim() : undefined;
   const cnpj = cnpjBruto ? cnpjBruto.replace(/[.\-\/]/g, "") : undefined;
 
+  // 🔒 BLINDAGEM 4.1: Esfera (Origem)
+  const esfera =
+    typeof params.esfera === "string" ? params.esfera.trim() : undefined;
+
   // 🔒 BLINDAGEM 5: Paginação segura
   const pageParam = parseInt(params.page as string, 10);
   const page = !isNaN(pageParam) && pageParam > 0 ? pageParam : 1;
@@ -49,7 +53,7 @@ export default async function PaginaBuscaProcessos({
   let query = supabase
     .from("processos_emendas")
     .select(
-      "hash, num, ano, num_formatado, assunto, data, hora, origem_setor, situacao_atual, search_autores, search_categoria, search_esfera, search_ano, search_entidade, search_cnpj, form_data",
+      "hash, num, ano, num_formatado, assunto, data, hora, origem_setor, situacao_atual, search_autores, search_categoria, search_esfera, search_ano, search_entidade, search_cnpj, id_assunto, form_data",
       { count: "exact" }
     )
     .is("id_emissao_base", null)
@@ -74,6 +78,16 @@ export default async function PaginaBuscaProcessos({
     });
   // CNPJ: busca por substring usando ilike + índice pg_trgm (sem curingas no B-Tree)
   if (cnpj) query = query.ilike("search_cnpj", `%${cnpj}%`);
+  if (esfera) {
+    const esferaLower = esfera.toLowerCase();
+    if (esferaLower === "municipal") {
+      query = query.or(`search_esfera.ilike.%${esfera}%,id_assunto.in.(1915774,1915763,1915772,1915764,1915739)`);
+    } else if (esferaLower === "estadual" || esferaLower === "federal") {
+      query = query.or(`search_esfera.ilike.%${esfera}%,id_assunto.eq.1915740`);
+    } else {
+      query = query.ilike("search_esfera", `%${esfera}%`);
+    }
+  }
 
   const { data: processos, count, error } = await query;
 
@@ -90,6 +104,7 @@ export default async function PaginaBuscaProcessos({
     autor: autorBruto ?? "",
     entidade: entidadeBruta ?? "",
     cnpj: cnpjBruto ?? "",
+    esfera: esfera ?? "",
   };
 
   return (
