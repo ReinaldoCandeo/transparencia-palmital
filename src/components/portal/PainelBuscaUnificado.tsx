@@ -21,12 +21,21 @@ const OPCOES_ANO = [
   }),
 ];
 
+const OPCOES_ORIGEM = [
+  { value: "", label: "Todas as Origens" },
+  { value: "Municipal", label: "🏛️ Municipal" },
+  { value: "Estadual", label: "🗺️ Estadual" },
+  { value: "Federal", label: "🇧🇷 Federal" },
+  { value: "Repasse", label: "🔄 Repasse" },
+];
+
 export interface FiltrosAtivos {
   ano: string;
   status: string;
   autor: string;
   entidade: string;
   cnpj: string;
+  esfera: string;
 }
 
 export function PainelBuscaUnificado({
@@ -196,6 +205,14 @@ export function PainelBuscaUnificado({
                 onChange={(v) => handleChange("ano", v)}
                 options={OPCOES_ANO}
               />
+              <div className="col-span-2 sm:col-span-3 md:col-span-2 lg:col-span-3">
+                <FiltroSelect
+                  label="Origem (Esfera)"
+                  value={filtrosAtivos.esfera}
+                  onChange={(v) => handleChange("esfera", v)}
+                  options={OPCOES_ORIGEM}
+                />
+              </div>
               <div className="col-span-2 sm:col-span-3 md:col-span-2 lg:col-span-3">
                  <FiltroAutorInput
                   value={filtrosAtivos.autor}
@@ -481,6 +498,7 @@ function ActiveFiltersChips({
     autor: "Autor",
     entidade: "Entidade",
     cnpj: "CNPJ",
+    esfera: "Origem",
   };
 
   const ativos = Object.entries(filtrosAtivos).filter(([, v]) => Boolean(v));

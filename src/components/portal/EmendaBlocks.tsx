@@ -325,13 +325,12 @@ export function EmendaTerceiroSetorBlock({
       case 1915739:
       case 1915740:
       case 1915796: return "Social";
-      case 1915759:
       case 1915772:
       case 1915800: return "Esporte";
       case 1915774:
       case 1915799: return "Agricultura e Meio Ambiente";
       case 1915763:
-      case 1915798: return "Educação";
+      case 1915798: return "Educação e Cultura";
       case 1915764:
       case 1915801: return "Saúde";
       default: return "Geral";
@@ -339,6 +338,7 @@ export function EmendaTerceiroSetorBlock({
   }
 
   const categoria = getCategoriaTerceiroSetor(idAssunto);
+  const origem = getOrigemTerceiroSetor(idAssunto);
 
   // Campos extras do grid (o que a whitelist aprovar e não está em destaque)
   const camposExtras = (formData || []).filter((item) => {
@@ -365,6 +365,11 @@ export function EmendaTerceiroSetorBlock({
               <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200 dark:border-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
                 {categoria}
               </span>
+              {origem && (
+                <span className="inline-flex items-center rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 border border-indigo-200 dark:border-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300">
+                  {origem}
+                </span>
+              )}
             </h3>
             {(modalidade || lei || numEspelho) && (
               <p className="mt-0.5 text-sm text-blue-600/80 dark:text-blue-400/70">
@@ -674,3 +679,21 @@ export function EmendaMunicipalBlock({
     </div>
   );
 }
+
+export function getOrigemTerceiroSetor(id?: number): string {
+  switch (id) {
+    case 1915774:
+    case 1915763:
+    case 1915772:
+    case 1915764:
+    case 1915739: return "Emenda Municipal";
+    case 1915740: return "Emenda Estadual/Federal";
+    case 1915799:
+    case 1915798:
+    case 1915800:
+    case 1915801:
+    case 1915796: return "Repasse";
+    default: return "";
+  }
+}
+

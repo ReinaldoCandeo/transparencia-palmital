@@ -12,6 +12,7 @@ import {
 import { StatusBadge } from "./StatusBadge";
 import { PortalLayout } from "@/components/portal/PortalLayout";
 import { PainelBuscaUnificado, type FiltrosAtivos } from "@/components/portal/PainelBuscaUnificado";
+import { getOrigemTerceiroSetor } from "@/components/portal/EmendaBlocks";
 import type { ProcessoEmendaRow } from "@/lib/schemas";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -232,7 +233,7 @@ export default function BuscaProcessosClient({
                       {p.assunto}
                     </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Origem: {p.origem_setor}
+                      Origem: {p.search_categoria === "terceiro_setor" ? getOrigemTerceiroSetor(p.id_assunto) : p.origem_setor}
                     </p>
                   </td>
                   <td className="px-4 py-4 text-muted-foreground">
