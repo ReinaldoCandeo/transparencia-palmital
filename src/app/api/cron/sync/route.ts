@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/db-admin";
-// import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@sentry/nextjs";
 import { obterProcessosPaginadoInterno, extractVinculadosHashesFromHtml } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
 
@@ -189,7 +189,7 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     // Try/Catch Blindado
     console.error("🚨 [CRON FATAL ERROR]:", error.message || error);
-    // Sentry.captureException(error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { ok: false, message: "Falha na sincronização", error: error.message },
       { status: 200 }

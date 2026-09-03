@@ -43,3 +43,5 @@ scripts/dumps/
 
 # Scripts locais de scratch/migração
 *.cjs
+# Sentry Config File
+.env.sentry-build-plugin
