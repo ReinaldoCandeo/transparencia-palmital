@@ -40,3 +40,6 @@ tsconfig.tsbuildinfo
 
 # Dumps e arquivos temporários de engenharia
 scripts/dumps/
+
+# Scripts locais de scratch/migração
+*.cjs
