@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Providers } from "@/components/Providers";
+import { Footer } from "@/components/portal/Footer";
 import Script from "next/script";
 import "./globals.css";
 
@@ -19,6 +20,8 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+
+        <Footer />
         
         {/* VLibras Widget */}
         <div {...{ vw: "true" }} className="enabled">

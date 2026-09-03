@@ -40,3 +40,8 @@ tsconfig.tsbuildinfo
 
 # Dumps e arquivos temporários de engenharia
 scripts/dumps/
+
+# Scripts locais de scratch/migração
+*.cjs
+# Sentry Config File
+.env.sentry-build-plugin

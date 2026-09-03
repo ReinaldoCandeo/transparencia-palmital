@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
     style-src 'self' 'unsafe-inline' https://*.vlibras.gov.br https://vlibras.gov.br https://fonts.googleapis.com https://cdn.jsdelivr.net;
     img-src 'self' blob: data: https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com;
     font-src 'self' https://*.vlibras.gov.br https://vlibras.gov.br https://fonts.gstatic.com https://cdn.jsdelivr.net;
-    connect-src 'self' https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com;
+    connect-src 'self' https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com https://*.sentry.io;
     worker-src 'self' blob:;
     child-src 'self' blob: https://vlibras.gov.br https://*.vlibras.gov.br;
     frame-src 'self' https://vlibras.gov.br https://*.vlibras.gov.br;

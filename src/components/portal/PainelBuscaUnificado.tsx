@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useTransition } from "react";
 import { X, Search, Target, SlidersHorizontal, Loader2, ChevronDown } from "lucide-react";
 
 const OPCOES_STATUS_REPASSE = [
@@ -26,7 +26,6 @@ const OPCOES_ORIGEM = [
   { value: "Municipal", label: "🏛️ Municipal" },
   { value: "Estadual", label: "🗺️ Estadual" },
   { value: "Federal", label: "🇧🇷 Federal" },
-  { value: "Repasse", label: "🔄 Repasse" },
 ];
 
 export interface FiltrosAtivos {
@@ -36,6 +35,7 @@ export interface FiltrosAtivos {
   entidade: string;
   cnpj: string;
   esfera: string;
+  natureza: string;
 }
 
 export function PainelBuscaUnificado({
@@ -45,6 +45,7 @@ export function PainelBuscaUnificado({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
 
   // Estados da Busca Exata (Acesso Direto)
   const [termoBusca, setTermoBusca] = useState("");
@@ -65,10 +66,16 @@ export function PainelBuscaUnificado({
     params.delete("page");
     
     // CORREÇÃO UX: { scroll: false } impede que a tela pule para o topo ao filtrar
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    startTransition(() => {
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    });
   };
 
-  const handleLimpar = () => router.push(pathname, { scroll: false });
+  const handleLimpar = () => {
+    startTransition(() => {
+      router.push(pathname, { scroll: false });
+    });
+  };
 
   // ─── Handler de Busca Exata (Acesso Direto) ───────────────────────────────
 
@@ -112,8 +119,45 @@ export function PainelBuscaUnificado({
 
   return (
     <div className="mx-auto max-w-5xl px-4 relative z-10 -mt-8 sm:-mt-12 mb-8">
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-xl shadow-black/5 ring-1 ring-black/5">
+      <div className={`rounded-2xl border border-border bg-card p-6 shadow-xl shadow-black/5 ring-1 ring-black/5 transition-opacity duration-200 ${isPending ? "opacity-50 pointer-events-none cursor-wait" : "opacity-100"}`}>
         
+        {/* TABS DE NATUREZA (EMENDAS VS REPASSES) */}
+        <div className="flex border-b border-border mb-6">
+          <button
+            type="button"
+            onClick={() => handleChange("natureza", "")}
+            className={`pb-2 px-4 text-sm font-medium transition-colors border-b-2 ${
+              filtrosAtivos.natureza === ""
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => handleChange("natureza", "emenda")}
+            className={`pb-2 px-4 text-sm font-medium transition-colors border-b-2 ${
+              filtrosAtivos.natureza === "emenda"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Emendas Parlamentares
+          </button>
+          <button
+            type="button"
+            onClick={() => handleChange("natureza", "repasse")}
+            className={`pb-2 px-4 text-sm font-medium transition-colors border-b-2 ${
+              filtrosAtivos.natureza === "repasse"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Repasses e Parcerias
+          </button>
+        </div>
+
         <div className="grid gap-8 md:grid-cols-2 md:divide-x md:divide-border">
           
           {/* COLUNA ESQUERDA: Acesso Direto */}
@@ -499,6 +543,7 @@ function ActiveFiltersChips({
     entidade: "Entidade",
     cnpj: "CNPJ",
     esfera: "Origem",
+    natureza: "Natureza",
   };
 
   const ativos = Object.entries(filtrosAtivos).filter(([, v]) => Boolean(v));

@@ -41,7 +41,11 @@ export default async function PaginaBuscaProcessos({
   const esfera =
     typeof params.esfera === "string" ? params.esfera.trim() : undefined;
 
-  // 🔒 BLINDAGEM 5: Paginação segura
+  // 🛡️ BLINDAGEM 4.2: Natureza (Emenda vs Repasse)
+  const natureza =
+    typeof params.natureza === "string" ? params.natureza.trim() : undefined;
+
+  // 🛡️ BLINDAGEM 5: Paginação segura
   const pageParam = parseInt(params.page as string, 10);
   const page = !isNaN(pageParam) && pageParam > 0 ? pageParam : 1;
   const limit = 20;
@@ -61,8 +65,19 @@ export default async function PaginaBuscaProcessos({
     .order("hora", { ascending: false })
     .range(start, end);
 
-  // 🔒 BLINDAGEM 6: Hard-filter para exibir apenas Terceiro Setor
+  // 🛡️ BLINDAGEM 6: Hard-filter para exibir apenas Terceiro Setor
   query = query.eq("search_categoria", "terceiro_setor");
+
+  // Filtro de Natureza (Emendas vs Repasses)
+  if (natureza === "emenda") {
+    query = query.in("id_assunto", [
+      1915774, 1915763, 1915772, 1915764, 1915739, 1915740,
+    ]);
+  } else if (natureza === "repasse") {
+    query = query.in("id_assunto", [
+      1915799, 1915798, 1915800, 1915801, 1915796,
+    ]);
+  }
 
   if (ano) query = query.eq("search_ano", ano);
   if (status) query = query.eq("situacao_atual", status);
@@ -105,6 +120,7 @@ export default async function PaginaBuscaProcessos({
     entidade: entidadeBruta ?? "",
     cnpj: cnpjBruto ?? "",
     esfera: esfera ?? "",
+    natureza: natureza ?? "",
   };
 
   return (
