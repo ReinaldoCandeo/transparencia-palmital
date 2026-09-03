@@ -75,9 +75,10 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   // Subprocessos podem ser mais antigos que a emenda (ex: licitações iniciadas antes do repasse).
   // Se o processo já está no DB (dbData), ignoramos o cutoff para permitir resyncs.
   if (ASSUNTOS_EMENDA.has(detalheCompleto.id_assunto) && !dbData) {
-    const CUTOFF_DATE = new Date("2026-07-01T00:00:00Z");
+    const rawCutoff = process.env.SYNC_CUTOFF_DATE || "2026-07-01T00:00:00Z";
+    const CUTOFF_DATE = new Date(rawCutoff);
     if (new Date(detalheCompleto.data) < CUTOFF_DATE) {
-      console.log(`[CORE] Processo ${hash} ignorado: Data de emissão (${detalheCompleto.data}) é anterior ao limite (01/07/2026).`);
+      console.log(`[CORE] Processo ${hash} ignorado: Data de emissão (${detalheCompleto.data}) é anterior ao limite (${rawCutoff}).`);
       return null;
     }
   }

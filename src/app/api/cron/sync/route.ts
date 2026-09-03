@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/db-admin";
+import * as Sentry from "@sentry/nextjs";
 import { obterProcessosPaginadoInterno, extractVinculadosHashesFromHtml } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
 
@@ -141,10 +142,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Funil de Segurança (Circuit Breaker)
-    // - Shallow: até 10 processos (só texto geralmente)
-    // - Deep: até 20 processos (checa a API se houve alteração)
-    // - Retry/Vinculados: até 2 processos (envolve download de PDF)
-    const limit = mode === "shallow" ? 10 : (mode === "deep" ? 20 : 2);
+    // - Shallow: até 5 processos
+    // - Deep: até 5 processos
+    // - Retry/Vinculados: até 5 processos
+    const limit = 5;
     const processosLimitados = processosParaSincronizar.slice(0, limit);
 
     if (processosLimitados.length === 0) {
@@ -187,7 +188,8 @@ export async function GET(req: NextRequest) {
 
   } catch (error: any) {
     // Try/Catch Blindado
-    console.error("❌ [CRON FATAL ERROR]:", error.message || error);
+    console.error("🚨 [CRON FATAL ERROR]:", error.message || error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { ok: false, message: "Falha na sincronização", error: error.message },
       { status: 200 }
