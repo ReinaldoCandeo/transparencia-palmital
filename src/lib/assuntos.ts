@@ -31,7 +31,6 @@ export const ASSUNTOS_EDUCACAO = new Set([
 export const ASSUNTOS_TERCEIRO_SETOR = new Set([
   1915739, // Terceiro Setor - Emendas Municipais - SOCIAL
   1915740, // Terceiro Setor - Emenda Parlamentar Estadual/Federal - SOCIAL
-  1915759, // Emenda Parlamentar - ESPORTE (formato antigo)
   1915774, // Terceiro Setor - Emendas Municipais - AGRICULTURA E MEIO AMBIENTE
   1915763, // Terceiro Setor - Emendas Municipais - EDUCAÇÃO E CULTURA
   1915772, // Terceiro Setor - Emendas Municipais - ESPORTE
