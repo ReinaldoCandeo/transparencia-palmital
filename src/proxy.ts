@@ -57,7 +57,7 @@ export async function proxy(request: NextRequest) {
     connect-src 'self' https://*.supabase.co https://*.vlibras.gov.br https://vlibras.gov.br https://*.amazonaws.com https://cdn.jsdelivr.net https://*.posthog.com https://*.i.posthog.com https://*.sentry.io;
     worker-src 'self' blob:;
     child-src 'self' blob: https://vlibras.gov.br https://*.vlibras.gov.br;
-    frame-src 'self' https://vlibras.gov.br https://*.vlibras.gov.br;
+    frame-src 'self' https://vlibras.gov.br https://*.vlibras.gov.br https://vercel.live;
     object-src 'none';
     base-uri 'self';
     form-action 'self';
