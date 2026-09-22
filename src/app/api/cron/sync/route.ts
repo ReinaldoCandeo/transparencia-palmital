@@ -13,6 +13,12 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  // DESATIVADO TEMPORARIAMENTE: Preparação para migração VPS
+  if (true) {
+    console.warn("⏱️ [CRON] Todos os cron jobs desativados temporariamente devido à migração para VPS.");
+    return NextResponse.json({ ok: true, message: "Cron jobs desativados temporariamente." });
+  }
+
   try {
     // 1. Barreira de Segurança (Authorization)
     const authHeader = req.headers.get("authorization");
@@ -72,8 +78,9 @@ export async function GET(req: NextRequest) {
         .order("ultima_sincronizacao", { ascending: true, nullsFirst: true })
         .limit(20);
 
-      if (dbProcessos && dbProcessos.length > 0) {
-        processosParaSincronizar = dbProcessos.map((p: any) => p.hash);
+      const processosDeep = dbProcessos || [];
+      if (processosDeep.length > 0) {
+        processosParaSincronizar = processosDeep.map((p: any) => p.hash);
       } else {
         return NextResponse.json({ ok: true, message: "Nenhum processo no banco para o deep sweep." });
       }
@@ -90,11 +97,12 @@ export async function GET(req: NextRequest) {
         .order("ultima_sincronizacao", { ascending: false })
         .limit(500);
 
-      if (dbProcessos) {
+      const processosRetry = dbProcessos || [];
+      if (processosRetry.length > 0) {
         if (mode === "vinculados") {
           // Extrai todos os hashes vinculados e identifica quais precisam ser baixados
           const vinculadosMap = new Map<string, string>(); // vinculadoHash -> parentIdEmissao
-          dbProcessos.forEach((dbProc: any) => {
+          processosRetry.forEach((dbProc: any) => {
             if (Array.isArray(dbProc.movimentacoes)) {
               dbProc.movimentacoes.forEach((m: any) => {
                 if (m.conteudo) {
@@ -122,7 +130,10 @@ export async function GET(req: NextRequest) {
             }
           }
         } else {
+          // DESATIVADO TEMPORARIAMENTE: Storage cheio.
           // Modo retry (anexos pendentes)
+          console.warn("⏱️ [CRON] Modo RETRY desativado temporariamente devido ao limite de storage.");
+          /*
           processosParaSincronizar = dbProcessos
             .filter((dbProc: any) => {
             let temAnexoPendente = false;
@@ -137,6 +148,7 @@ export async function GET(req: NextRequest) {
             return temAnexoPendente;
           })
           .map((p) => p.hash);
+          */
         }
       }
     }
@@ -175,11 +187,13 @@ export async function GET(req: NextRequest) {
 
       const result = await syncProcessByHash(hashToSync, TIMEOUT_MS, parentId);
       
-      if (result) {
-        safeProcessos.push(result.data);
-        if (result.timeExceeded) {
-          timeExceeded = true;
-        }
+      const resData = result?.data;
+      if (resData) {
+        safeProcessos.push(resData);
+      }
+      
+      if (result?.timeExceeded) {
+        timeExceeded = true;
       }
     }
 

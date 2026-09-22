@@ -124,7 +124,9 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
         break;
       }
 
-      a.url_storage = await syncAnexoStorage(hash, a._url_original, a.arquivo, a.id_externo);
+      // DESATIVADO TEMPORARIAMENTE: Storage Supabase cheio, preparação para migração VPS
+      // a.url_storage = await syncAnexoStorage(hash, a._url_original, a.arquivo, a.id_externo);
+      console.warn(`[CORE] Download do anexo ${a.arquivo} ignorado devido a limite de storage.`);
     }
   };
 
