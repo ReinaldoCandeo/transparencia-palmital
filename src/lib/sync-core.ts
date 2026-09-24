@@ -1,6 +1,6 @@
 import { obterDetalheInterno } from "@/lib/onedoc";
 import { ASSUNTOS_EMENDA } from "@/lib/assuntos";
-import { syncAnexoStorage } from "@/lib/storage-sync";
+
 import { processoEmendaSchema, flattenProcessoParaRow } from "@/lib/schemas";
 import { supabaseAdmin } from "@/lib/db-admin";
 
@@ -14,9 +14,6 @@ import { supabaseAdmin } from "@/lib/db-admin";
  * @returns O Processo processado ou `null` se der falha ou timeout completo
  */
 export async function syncProcessByHash(hash: string, timeoutMs: number = 50000, forceIdEmissaoBase?: string, bypassGatekeeper: boolean = false) {
-  const syncStartTime = Date.now();
-  let timeExceeded = false;
-
   console.log(`[CORE] Iniciando sincronização do processo: ${hash}`);
 
   // 1. Busca detalhes mais aprofundados do processo na 1Doc
@@ -84,61 +81,7 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   }
   // ------------------------------------------------------
 
-  const existingUrls = new Map<string, string>();
-  if (dbData) {
-    if (Array.isArray(dbData.anexos)) {
-      dbData.anexos.forEach((a: any) => {
-        if (a._url_original && a.url_storage) existingUrls.set(a._url_original, a.url_storage);
-      });
-    }
-    if (Array.isArray(dbData.movimentacoes)) {
-      dbData.movimentacoes.forEach((m: any) => {
-        if (Array.isArray(m.anexos)) {
-          m.anexos.forEach((a: any) => {
-            if (a._url_original && a.url_storage) existingUrls.set(a._url_original, a.url_storage);
-          });
-        }
-      });
-    }
-  }
 
-  // 3. Helper de Download (Sequencial)
-  const downloadAnexosSequencial = async (anexos: any[]) => {
-    if (!anexos || anexos.length === 0) return;
-    
-    for (const a of anexos) {
-      if (!a._url_original) continue;
-      
-      // Cache
-      if (existingUrls.has(a._url_original)) {
-        a.url_storage = existingUrls.get(a._url_original);
-        continue;
-      }
-      
-      if (a.url_storage) continue;
-
-      // Circuit Breaker
-      if (Date.now() - syncStartTime > timeoutMs) {
-        timeExceeded = true;
-        console.warn(`[CORE] Timeout de ${timeoutMs}ms estourado no processo ${hash}. Downloads suspensos.`);
-        break;
-      }
-
-      // DESATIVADO TEMPORARIAMENTE: Storage Supabase cheio, preparação para migração VPS
-      // a.url_storage = await syncAnexoStorage(hash, a._url_original, a.arquivo, a.id_externo);
-      console.warn(`[CORE] Download do anexo ${a.arquivo} ignorado devido a limite de storage.`);
-    }
-  };
-
-  // 4. Baixa e vincula URLs aos anexos do processo principal e movimentações
-  if (!timeExceeded) {
-    await downloadAnexosSequencial(detalheCompleto.anexos || []);
-  }
-  
-  for (const m of detalheCompleto.movimentacoes || []) {
-    if (timeExceeded) break;
-    await downloadAnexosSequencial(m.anexos || []);
-  }
 
   // 5. Normaliza
   const payloadFlat = flattenProcessoParaRow(detalheCompleto);
@@ -190,6 +133,6 @@ export async function syncProcessByHash(hash: string, timeoutMs: number = 50000,
   
   return {
     data: result.data,
-    timeExceeded
+    timeExceeded: false
   };
 }

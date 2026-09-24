@@ -13,11 +13,7 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  // DESATIVADO TEMPORARIAMENTE: Preparação para migração VPS
-  if (true) {
-    console.warn("⏱️ [CRON] Todos os cron jobs desativados temporariamente devido à migração para VPS.");
-    return NextResponse.json({ ok: true, message: "Cron jobs desativados temporariamente." });
-  }
+
 
   try {
     // 1. Barreira de Segurança (Authorization)
@@ -130,25 +126,8 @@ export async function GET(req: NextRequest) {
             }
           }
         } else {
-          // DESATIVADO TEMPORARIAMENTE: Storage cheio.
-          // Modo retry (anexos pendentes)
-          console.warn("⏱️ [CRON] Modo RETRY desativado temporariamente devido ao limite de storage.");
-          /*
-          processosParaSincronizar = dbProcessos
-            .filter((dbProc: any) => {
-            let temAnexoPendente = false;
-            if (Array.isArray(dbProc.anexos)) {
-              if (dbProc.anexos.some((a: any) => a.arquivo && !a.url_storage)) temAnexoPendente = true;
-            }
-            if (Array.isArray(dbProc.movimentacoes)) {
-              if (dbProc.movimentacoes.some((m: any) => Array.isArray(m.anexos) && m.anexos.some((a: any) => a.arquivo && !a.url_storage))) {
-                temAnexoPendente = true;
-              }
-            }
-            return temAnexoPendente;
-          })
-          .map((p) => p.hash);
-          */
+          console.warn("⏱️ [CRON] Modo RETRY para anexos obsoleto (Storage removido da arquitetura).");
+          return NextResponse.json({ ok: true, message: "Modo retry obsoleto." });
         }
       }
     }
