@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { assertSecretAuth } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
-  // ── Barreira de Segurança (Idêntica ao Cron) ──────────────────────────────
-  // Este endpoint é exclusivo para debug interno e nunca deve ser público.
-  const authHeader = req.headers.get("authorization");
-  const expectedSecret = `Bearer ${process.env.CRON_SECRET}`;
-
-  if (!process.env.CRON_SECRET || authHeader !== expectedSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ── Barreira de Segurança Centralizada (CRON_SECRET) ──────────────────────
+  const authError = assertSecretAuth(req, "CRON_SECRET");
+  if (authError) {
+    return authError;
   }
   // ────────────────────────────────────────────────────────────────────────
 

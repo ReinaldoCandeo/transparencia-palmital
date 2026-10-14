@@ -127,3 +127,22 @@ export function flattenProcessoParaRow(p: ProcessoPublico): ProcessoEmendaRow {
 
   return rowLimpa as ProcessoEmendaRow;
 }
+
+/**
+ * Schema Zod mínimo e resiliente para o payload do Webhook da 1Doc.
+ * Valida apenas o campo essencial emissao.hash e aplica .passthrough()
+ * para garantir compatibilidade com campos novos ou dinâmicos enviados pela 1Doc.
+ */
+export const webhook1DocPayloadSchema = z
+  .object({
+    emissao: z
+      .object({
+        hash: z.string().min(1, "Hash da emissão é obrigatório"),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+export type Webhook1DocPayload = z.infer<typeof webhook1DocPayloadSchema>;
+

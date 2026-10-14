@@ -1,11 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { obterProcessosPaginadoInterno } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
+import { assertSecretAuth } from "@/lib/api-auth";
 
 export const maxDuration = 300; 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = assertSecretAuth(req, "CRON_SECRET");
+  if (authError) {
+    return authError;
+  }
+
   console.log("🚀 Iniciando Backfill 2026+...");
   
   try {
@@ -48,8 +54,9 @@ export async function GET() {
 
     console.log(`\n✅ Backfill Finalizado! Total sincronizado: ${totalSincronizados}`);
     return NextResponse.json({ ok: true, message: "Backfill finalizado", total: totalSincronizados });
-  } catch (err: any) {
-    console.error("Erro no backfill:", err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("Erro no backfill:", errorMessage);
+    return NextResponse.json({ ok: false, error: errorMessage }, { status: 500 });
   }
 }
