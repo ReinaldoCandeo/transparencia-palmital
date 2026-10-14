@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/db-admin";
 import * as Sentry from "@sentry/nextjs";
 import { obterProcessosPaginadoInterno, extractVinculadosHashesFromHtml } from "@/lib/onedoc";
 import { syncProcessByHash } from "@/lib/sync-core";
+import { assertSecretAuth } from "@/lib/api-auth";
 
 // =========================================================================
 // ⏱️ PROTEÇÃO SERVERLESS VERCEL
@@ -13,16 +14,12 @@ export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-
-
   try {
-    // 1. Barreira de Segurança (Authorization)
-    const authHeader = req.headers.get("authorization");
-    const expectedSecret = `Bearer ${process.env.CRON_SECRET}`;
-
-    if (!process.env.CRON_SECRET || authHeader !== expectedSecret) {
+    // 1. Barreira de Segurança Centralizada (Authorization Bearer)
+    const authError = assertSecretAuth(req, "CRON_SECRET");
+    if (authError) {
       console.warn("🔒 [CRON] Tentativa de acesso não autorizada à rota de sync.");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return authError;
     }
 
     // Identifica o modo de operação (padrão: retry)

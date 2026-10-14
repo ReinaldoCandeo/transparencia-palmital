@@ -1,5 +1,6 @@
 import { buscarDetalhe } from "@/lib/onedoc";
 import { ASSUNTOS_EMENDA } from "@/lib/assuntos";
+import { assertSecretAuth } from "@/lib/api-auth";
 
 export const revalidate = 0; // Removido o cache ISR para evitar exposição de dados sensíveis cacheados
 
@@ -7,12 +8,9 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ hash: string }> }
 ) {
-  // S2: Proteção da rota com Token Bearer (mesmo do Cron)
-  const authHeader = request.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  
-  if (!secret || authHeader !== `Bearer ${secret}`) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const authError = assertSecretAuth(request, "CRON_SECRET");
+  if (authError) {
+    return authError;
   }
 
   const { hash } = await params;
