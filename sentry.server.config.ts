@@ -3,7 +3,7 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from "@sentry/nextjs";
-import { sanitizeSentryEvent } from "@/lib/sentry-sanitize";
+import { sanitizeSentryEvent } from "./src/lib/sentry-sanitize";
 
 Sentry.init({
   dsn: "https://0bd79e584111883d3e52e9e687497458@o4512022586982400.ingest.us.sentry.io/4512022714122240",

@@ -2,6 +2,7 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "sentry.*.config.ts",
     "vite.config.ts",
     "eslint.config.js",
     ".next/types/**/*.ts",
