@@ -31,8 +31,8 @@ export default function RootLayout({
           </div>
         </div>
         <Script src="https://vlibras.gov.br/app/vlibras-plugin.js" strategy="afterInteractive" />
-        <Script id="vlibras-init" strategy="afterInteractive" dangerouslySetInnerHTML={{
-          __html: `
+        <Script id="vlibras-init" strategy="afterInteractive">
+          {`
             const initVLibras = () => {
               if (window.VLibras) {
                 new window.VLibras.Widget('https://vlibras.gov.br/app');
@@ -41,8 +41,8 @@ export default function RootLayout({
               }
             };
             initVLibras();
-          `
-        }} />
+          `}
+        </Script>
       </body>
     </html>
   );

@@ -146,3 +146,18 @@ export const webhook1DocPayloadSchema = z
 
 export type Webhook1DocPayload = z.infer<typeof webhook1DocPayloadSchema>;
 
+/**
+ * Schema Zod para o retorno enxuto e seguro de GET /api/health.
+ * Previne vazamento de informações de infraestrutura do host e mensagens cruas de erro.
+ */
+export const healthResponseSchema = z.object({
+  status: z.enum(["ok", "degraded", "error"]),
+  timestamp: z.string(),
+  latencyMs: z.number(),
+  sync: z.object({
+    lastSyncAt: z.string().nullable(),
+    status: z.enum(["synced", "stale", "unknown"]),
+  }),
+});
+
+export type HealthResponse = z.infer<typeof healthResponseSchema>;

@@ -20,6 +20,7 @@ import {
 } from "@/lib/emendaUtils";
 import { ASSUNTOS_TERCEIRO_SETOR } from "@/lib/onedoc";
 import { extractAnoEmenda } from "@/lib/search-extractors";
+import { SafeHtml } from "@/components/portal/SafeHtml";
 
 // ─── Whitelists ──────────────────────────────────────────────────────────────
 
@@ -254,9 +255,9 @@ export function EmendaSaudeBlock({
             <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
               <ScrollText className="h-3.5 w-3.5" /> Justificativa da Emenda
             </h4>
-            <div
+            <SafeHtml
+              html={conteudo}
               className="prose prose-sm dark:prose-invert max-w-none text-foreground/80 rounded-lg bg-muted/30 p-4"
-              dangerouslySetInnerHTML={{ __html: conteudo }}
             />
           </div>
         )}
@@ -476,9 +477,9 @@ export function EmendaTerceiroSetorBlock({
         {conteudo && !ASSUNTOS_TERCEIRO_SETOR.has(idAssunto || 0) && (
           <div className="border-t pt-5">
             <h4 className="mb-2 text-sm font-bold text-muted-foreground">Justificativa / Objeto</h4>
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
-              dangerouslySetInnerHTML={{ __html: conteudo }}
+            <SafeHtml
+              html={conteudo}
+              className="prose prose-sm dark:prose-invert max-w-none text-foreground/85 rounded-lg bg-muted/30 p-4"
             />
           </div>
         )}
