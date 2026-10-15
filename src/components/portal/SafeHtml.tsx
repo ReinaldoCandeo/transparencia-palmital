@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * Mapeamento das entidades HTML nomeadas mais comuns (incluindo acentuação em pt-BR).
@@ -116,6 +117,26 @@ const ALLOWED_TAGS = new Set([
   "sup",
 ]);
 
+/** Elementos de bloco que acionam auto-close em <p> para evitar aninhamento inválido no HTML5/React 19 */
+const BLOCK_TAGS = new Set([
+  "p",
+  "div",
+  "ul",
+  "ol",
+  "table",
+  "blockquote",
+  "hr",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+]);
+
+/** Tags estruturais de tabela onde nós de texto vazios geram erro de hidratação */
+const TABLE_STRUCTURAL_TAGS = new Set(["table", "thead", "tbody", "tfoot", "tr"]);
+
 /** Elementos void (sem tag de fechamento) */
 const VOID_TAGS = new Set(["br", "hr"]);
 
@@ -160,7 +181,8 @@ function removeUnsafeBlocks(html: string): string {
 }
 
 /**
- * Converte HTML bruto da 1Doc em árvore de nós seguros.
+ * Converte HTML bruto da 1Doc em árvore de nós seguros, aplicando regras estritas
+ * de aninhamento do HTML5/React 19 para prevenir erros de hidratação.
  */
 function parseHtmlToAst(rawHtml: string): AstNode[] {
   const cleanHtml = removeUnsafeBlocks(rawHtml);
@@ -171,6 +193,21 @@ function parseHtmlToAst(rawHtml: string): AstNode[] {
     return stack.length > 0 ? stack[stack.length - 1].children : rootNodes;
   };
 
+  const pushText = (text: string) => {
+    if (!text) return;
+    const decoded = decodeHtmlEntities(text);
+    if (!decoded) return;
+
+    const currentParent = stack.length > 0 ? stack[stack.length - 1] : null;
+
+    // Ignora nós de texto com apenas espaços em branco dentro de elementos estruturais de tabela
+    if (currentParent && TABLE_STRUCTURAL_TAGS.has(currentParent.tag) && !decoded.trim()) {
+      return;
+    }
+
+    getCurrentChildren().push({ type: "text", text: decoded });
+  };
+
   const tagRegex = /<\/?([a-zA-Z0-9]+)(\s[^>]*)?\/?>/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -178,10 +215,7 @@ function parseHtmlToAst(rawHtml: string): AstNode[] {
   while ((match = tagRegex.exec(cleanHtml)) !== null) {
     const textBefore = cleanHtml.slice(lastIndex, match.index);
     if (textBefore) {
-      const decoded = decodeHtmlEntities(textBefore);
-      if (decoded) {
-        getCurrentChildren().push({ type: "text", text: decoded });
-      }
+      pushText(textBefore);
     }
 
     lastIndex = tagRegex.lastIndex;
@@ -205,6 +239,40 @@ function parseHtmlToAst(rawHtml: string): AstNode[] {
     // Se a tag não for permitida pela whitelist, ignoramos a tag mas o texto interno continua
     if (!ALLOWED_TAGS.has(tagName)) {
       continue;
+    }
+
+    // 1. Auto-close de <p>: se abrir uma tag de bloco e houver um <p> aberto, desempilha até o <p>
+    if (BLOCK_TAGS.has(tagName)) {
+      const pIndex = stack.map((item) => item.tag).lastIndexOf("p");
+      if (pIndex !== -1) {
+        stack.length = pIndex;
+      }
+    }
+
+    // 2. Auto-close de <li>: se abrir <li> e o topo da stack for outro <li>, fecha o anterior
+    if (tagName === "li" && stack.length > 0 && stack[stack.length - 1].tag === "li") {
+      stack.pop();
+    }
+
+    // 3. Tabelas válidas no React 19: se abrir <tr> e o pai direto for <table>, insere/reutiliza <tbody>
+    if (tagName === "tr") {
+      const currentParent = stack.length > 0 ? stack[stack.length - 1] : null;
+      if (currentParent && currentParent.tag === "table") {
+        let tbodyNode = currentParent.children
+          .filter((c): c is AstElement => c.type === "element" && c.tag === "tbody")
+          .slice(-1)[0];
+
+        if (!tbodyNode) {
+          tbodyNode = {
+            type: "element",
+            tag: "tbody",
+            props: {},
+            children: [],
+          };
+          currentParent.children.push(tbodyNode);
+        }
+        stack.push(tbodyNode);
+      }
     }
 
     const props: Record<string, unknown> = {};
@@ -235,10 +303,7 @@ function parseHtmlToAst(rawHtml: string): AstNode[] {
   // Captura qualquer texto restante após a última tag
   const remainingText = cleanHtml.slice(lastIndex);
   if (remainingText) {
-    const decoded = decodeHtmlEntities(remainingText);
-    if (decoded) {
-      getCurrentChildren().push({ type: "text", text: decoded });
-    }
+    pushText(remainingText);
   }
 
   return rootNodes;
@@ -259,6 +324,9 @@ function renderAstNode(node: AstNode, key: string | number): React.ReactNode {
     renderedChildren.length > 0 ? renderedChildren : undefined
   );
 }
+
+const DEFAULT_TYPOGRAPHY_CLASSES =
+  "leading-relaxed space-y-2 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-3 [&_li]:mb-1 [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_a]:font-medium [&_blockquote]:border-l-4 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:italic [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted/50 [&_td]:border [&_td]:border-border [&_td]:p-2";
 
 export interface SafeHtmlProps {
   html?: string | null;
@@ -281,7 +349,7 @@ export function SafeHtml({ html, className }: SafeHtmlProps) {
   }
 
   return (
-    <div className={className}>
+    <div className={cn(DEFAULT_TYPOGRAPHY_CLASSES, className)}>
       {ast.map((node, index) => renderAstNode(node, index))}
     </div>
   );

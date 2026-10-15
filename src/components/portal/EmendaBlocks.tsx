@@ -479,7 +479,7 @@ export function EmendaTerceiroSetorBlock({
             <h4 className="mb-2 text-sm font-bold text-muted-foreground">Justificativa / Objeto</h4>
             <SafeHtml
               html={conteudo}
-              className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground"
+              className="prose prose-sm dark:prose-invert max-w-none text-foreground/85 rounded-lg bg-muted/30 p-4"
             />
           </div>
         )}
