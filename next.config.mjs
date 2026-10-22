@@ -1,9 +1,15 @@
 import { withSentryConfig } from "@sentry/nextjs";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Ponte build-time para Client Components: o Next.js só injeta no bundle do navegador
+  // variáveis NEXT_PUBLIC_*. Na Vercel só existem SUPABASE_URL/SUPABASE_ANON_KEY.
+  // SEGURANÇA: expor APENAS a URL pública e a anon key (protegida por RLS).
+  // NUNCA adicionar SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET, WEBHOOK_SECRET ou ONEDOC_AUTH_HASH aqui.
   env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "",
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "",
   },
   experimental: {
     // after: true (no longer needed in newer next.js, the build log had a warning about it so let's just remove it or keep it)
