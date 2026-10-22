@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Building2, Moon, Sun, Scale, Menu, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { env } from "@/lib/env";
 
 export function PortalLayout({ children }: { children: ReactNode }) {
   const [dark, setDark] = useState(false);
@@ -60,8 +61,8 @@ export function PortalLayout({ children }: { children: ReactNode }) {
         Acessibilidade
       </Link>
       <a
-        href={process.env.NEXT_PUBLIC_ESIC_URL || "#"}
-        target={process.env.NEXT_PUBLIC_ESIC_URL ? "_blank" : "_self"}
+        href={env.public.NEXT_PUBLIC_ESIC_URL || "#"}
+        target={env.public.NEXT_PUBLIC_ESIC_URL ? "_blank" : "_self"}
         rel="noopener noreferrer"
         className="block rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
         onClick={() => setIsMobileMenuOpen(false)}

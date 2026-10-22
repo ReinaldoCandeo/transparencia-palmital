@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertSecretAuth } from "@/lib/api-auth";
+import { getServerEnv } from "@/lib/env";
 
 export async function GET(req: NextRequest) {
   // ── Barreira de Segurança Centralizada (CRON_SECRET) ──────────────────────
@@ -9,15 +10,7 @@ export async function GET(req: NextRequest) {
   }
   // ────────────────────────────────────────────────────────────────────────
 
-  const baseUrl = process.env.ONEDOC_BASE_URL;
-  const authHash = process.env.ONEDOC_AUTH_HASH;
-
-  if (!baseUrl || !authHash) {
-    return NextResponse.json(
-      { error: "Erro Crítico: Variáveis ONEDOC_BASE_URL ou ONEDOC_AUTH_HASH não configuradas." },
-      { status: 500 }
-    );
-  }
+  const { ONEDOC_BASE_URL: baseUrl, ONEDOC_AUTH_HASH: authHash } = getServerEnv();
 
   // ── MODO INSPECÇÃO POR HASH (?hash=XXXX) ───────────────────────────────────
   // Bate diretamente no endpoint de detalhe da 1Doc e retorna o payload bruto.

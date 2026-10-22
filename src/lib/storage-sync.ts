@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./db-admin";
+import { getServerEnv } from "./env";
 
 /**
  * Higieniza o nome do arquivo para garantir links seguros.
@@ -8,7 +9,7 @@ function slugifyFilename(filename: string) {
   return filename
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove acentos
-    .replace(/[^a-zA-Z0-9.\-]/g, "-") // Troca inválidos por hífen
+    .replace(/[^a-zA-Z0-9.-]/g, "-") // Troca inválidos por hífen
     .replace(/-+/g, "-") // Remove hifens duplicados
     .toLowerCase();
 }
@@ -21,9 +22,10 @@ export async function syncAnexoStorage(hash: string, urlOriginal: string, filena
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000); // 30s de limite por arquivo
+    const { ONEDOC_AUTH_HASH } = getServerEnv();
 
     const res = await fetch(urlOriginal, {
-      headers: { "X-Auth-Hash": process.env.ONEDOC_AUTH_HASH || "" },
+      headers: { "X-Auth-Hash": ONEDOC_AUTH_HASH },
       signal: controller.signal
     });
     

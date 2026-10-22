@@ -45,3 +45,6 @@ scripts/dumps/
 *.cjs
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Specs de tarefas de agentes (manter localmente)
+docs/specs/

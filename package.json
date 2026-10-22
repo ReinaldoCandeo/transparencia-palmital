@@ -1,5 +1,5 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "transparencia-palmital",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -7,6 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src sentry.server.config.ts sentry.edge.config.ts sentry.client.config.ts",
     "format": "prettier --write .",
     "sync:carga-inicial": "tsx --env-file=.env.local scripts/carga-inicial-storage.ts",
@@ -44,7 +46,6 @@
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.110.0",
     "@tailwindcss/postcss": "^4.3.2",
-    "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.101.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -80,10 +81,10 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
-    "nitro": "3.0.260603-beta",
     "prettier": "^3.7.3",
     "tsx": "^4.23.1",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^3.0.7"
   }
 }

@@ -3,8 +3,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "sentry.*.config.ts",
-    "vite.config.ts",
     "eslint.config.js",
+    "vitest.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
@@ -16,9 +16,6 @@
       "ES2022",
       "DOM",
       "DOM.Iterable"
-    ],
-    "types": [
-      "vite/client"
     ],
     /* Bundler mode */
     "moduleResolution": "Bundler",
@@ -49,6 +46,8 @@
     ]
   },
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "scripts",
+    "**/*.cjs"
   ]
 }

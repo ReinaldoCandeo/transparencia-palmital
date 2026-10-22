@@ -257,7 +257,7 @@ export function extractSearchValorGlobal(valorCru: string | null | undefined): n
 
   const finalFloat = parseFloat(limpo);
   const resultado = isNaN(finalFloat) ? 0 : finalFloat;
-  return isNegative ? -resultado : resultado;
+  return (isNegative && resultado !== 0) ? -resultado : resultado;
 }
 
 /**
@@ -266,14 +266,14 @@ export function extractSearchValorGlobal(valorCru: string | null | undefined): n
 export function isAnexoSensivel(filename: string | null | undefined): boolean {
   if (!filename) return false;
 
-  // Normaliza o nome do arquivo (remove acentos, deixa em minúsculo)
-  const limpo = removeAcentos(filename).toLowerCase();
+  // Normaliza o nome do arquivo (remove acentos, deixa em minúsculo e converte separadores como '_' em espaços)
+  const limpo = removeAcentos(filename).toLowerCase().replace(/[_-]/g, " ");
 
   // Bloqueio blindado exato: se contiver "dados sensíveis"
   if (limpo.includes("dados sensiveis")) return true;
 
   // Expressão Regular com Word Boundaries (\b) para a Blocklist Oficial Atualizada.
-  // Evita falsos positivos como "comprovante_cpfl_energia.pdf"
+  // Evita falsos positivos como "comprovante cpfl energia.pdf"
   const regexSensivel = /\b(rg|cpf|cnh|obito|documento pessoal|identidade|carteira de trabalho|ctps|titulo de eleitor|passaporte|holerite|cns|cartao do sus|residencia|endereco|nascimento|casamento)\b/i;
 
   return regexSensivel.test(limpo);
